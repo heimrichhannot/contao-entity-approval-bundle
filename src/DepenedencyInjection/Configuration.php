@@ -66,7 +66,7 @@ class Configuration implements ConfigurationInterface
                                         ->info('Should an email be sent to new auditor on auditor change?')
                                         ->defaultValue(true)
                                     ->end()
-                                    ->booleanBode('state_change_author')
+                                    ->booleanNode('state_change_author')
                                         ->info('Should an email be sent to author on state change of the entity')
                                         ->defaultValue(true)
                                     ->end()

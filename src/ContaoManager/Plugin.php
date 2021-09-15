@@ -26,11 +26,9 @@ class Plugin implements BundlePluginInterface, ConfigPluginInterface
     public function getBundles(ParserInterface $parser)
     {
         return [
-            BundleConfig::create(HeimrichHannotEntityApprovementBundle::class)->setLoadAfter(
-                [
+            BundleConfig::create(HeimrichHannotEntityApprovementBundle::class)->setLoadAfter([
                     ContaoCoreBundle::class,
-                ]
-            ),
+            ]),
         ];
     }
 
@@ -39,6 +37,6 @@ class Plugin implements BundlePluginInterface, ConfigPluginInterface
      */
     public function registerContainerConfiguration(LoaderInterface $loader, array $managerConfig)
     {
-        $loader->load('@HeimrichHannotEntitiyApprovementBundle/Resources/config/services.yml');
+        $loader->load('@HeimrichHannotEntityApprovementBundle/Resources/config/services.yml');
     }
 }
