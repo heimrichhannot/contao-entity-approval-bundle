@@ -5,3 +5,8 @@ services:
     public: true
     bind:
       $bundleConfig: '%huh_entity_approvement%'
+
+  HeimrichHannot\EntityApprovementBundle\EventListener\Contao\LoadDataContainerListener: ~
+
+  HeimrichHannot\EntityApprovementBundle\Manager\:
+    resource: ../../Manager/*
