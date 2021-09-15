@@ -1,0 +1,45 @@
+- Submission
+- Prüfer -> Select (eine Person)
+- Autor ist Autor der Entität (also der Submission)
+- E-Mail Versand:
+  - Prüfer wechselt -> Mail an bisherigen Prüfer und an neuen Prüfer
+  - Zustandsänderung z.B. In Progress auf Approved, oder auf Changes requested -> Mail an Autor
+- Zustand an Entität (entität.state -> tl_submission.state -> select -> wenn state nicht approved dann validierungsfehler bei published) -> In Arbeit (in_progress), Freigegeben (approved), Abgelehnt (rejected), changes_requested (Änderungen angefordert)
+- Häkchen "informAuthor" -> default aus
+- Anmerkungen an den Autor
+- workflow mit symfony/workflow -> orientieren an drafts-bundle -> zustände vereinfachen
+- neues Feld "Prüfer" (auditor) -> Benutzer (Backend) aus bestimmten Gruppen (mehrere)
+- E-Mails werden über Notification Center versandt und haben eigene Typen (huh_entity_approval_auditor_changed, huh_entity_approval_state_changed) -> siehe drafts bundle config.php
+ 
+ 
+ 
+----
+ 
+Entität ist variabel (kann submission, muss nicht)
+ 
+Konfiguration:
+ 
+- 2. Priorität -> yml-Config
+- 1. Page-Root -> überschreibt yml, wenn gesetzt
+ 
+huh_entity_approval:
+  tl_submission:
+    initial_auditor_groups: 1
+    auditor_groups: 1,2,6
+    initial_auditor_mode: random, all
+    publish_field: published (default)
+    invert_publish_field: true (default: false) -> tl_member.disable
+    emails:
+      auditor_changed_former: true
+      auditor_changed_new: true
+      state_change_author: true
+ 
+EntityApprovalManager->addApprovalToDca('tl_submission')
+ 
+-> save_callback -> prüfen, ob state auf approved steht
+-> felder (auditor, state, notes, informAuthor)
+ 
+Custom: 
+ 
+- Operation an tl_submission  convert submission -> tl_faq mit Kategorie übernehmen (association)
+- neues feld submissionAuthorMessage und Checkbox informSubmissionAuthor 
