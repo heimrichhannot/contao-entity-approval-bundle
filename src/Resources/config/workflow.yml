@@ -1,0 +1,37 @@
+framework:
+  workflows:
+    entity_approvement:
+      type: 'state_machine'
+      audit_trail:
+        enabled: true
+      marking_store:
+        type: 'single_state'
+        arguments:
+          - 'state'
+      supports:
+        - Contao\Model
+      initial_place: submit
+      places:
+        - submit
+        - in_progress
+        - changes_requested
+        - approved
+        - rejected
+      transitions:
+        assign_auditor:
+          from: submit
+          to: in_progress
+        approve:
+          from: in_progress
+          to: approved
+        reject:
+          from: in_progress
+          to: rejected
+        request_change:
+          from: in_progress
+          to: changes_requested
+        apply_change:
+          from: changes_requested
+          to: in_progress
+
+

@@ -1,5 +1,9 @@
 # contao-entity-approvement-bundle
 
+## Workflow
+
+![workflow](docs/img/approvement-process.jpg)
+
 ### config.yml
 
 ```yaml

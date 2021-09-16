@@ -8,6 +8,7 @@
 namespace HeimrichHannot\EntityApprovementBundle\Manager;
 
 use Contao\CoreBundle\DataContainer\PaletteManipulator;
+use Contao\DataContainer;
 use HeimrichHannot\EntityApprovementBundle\DataContainer\EntityApprovementContainer;
 use HeimrichHannot\UtilsBundle\Dca\DcaUtil;
 
@@ -53,6 +54,13 @@ class EntityApprovementManager
                 $fieldManipulator->applyToPalette($key, $table);
             }
         }
+
+        $dca = &$GLOBALS['TL_DCA'][$table];
+        $dca['config']['onsubmit_callback'] = [EntityApprovementContainer::class, 'initWorkflow'];
+    }
+
+    public function initWorkflow(DataContainer $dc): void
+    {
     }
 
     private function addApprovementFieldsToDca(string $table): void
