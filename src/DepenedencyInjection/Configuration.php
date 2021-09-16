@@ -33,6 +33,10 @@ class Configuration implements ConfigurationInterface
         $rootNode
             ->arrayPrototype()
                 ->children()
+                    ->booleanNode('exclude_from_palettes')
+                        ->info('Should the Fields be applied to DCA palettes')
+                        ->defaultValue(false)
+                    ->end()
                     ->scalarNode('initial_auditor_groups')
                         ->info('List of usergroups who are responsible to assign final approval usergroups.')
                         ->cannotBeEmpty()

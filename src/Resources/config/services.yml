@@ -10,3 +10,6 @@ services:
 
   HeimrichHannot\EntityApprovementBundle\Manager\:
     resource: ../../Manager/*
+
+  HeimrichHannot\EntityApprovementBundle\DataContainer\:
+    resource: ../../DataContainer/*

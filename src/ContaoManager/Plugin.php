@@ -27,6 +27,7 @@ class Plugin implements BundlePluginInterface, ConfigPluginInterface
     {
         return [
             BundleConfig::create(HeimrichHannotEntityApprovementBundle::class)->setLoadAfter([
+                    'submissions',
                     ContaoCoreBundle::class,
             ]),
         ];
