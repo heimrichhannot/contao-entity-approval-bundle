@@ -19,3 +19,5 @@ huh_entity_approvement:
       auditor_changed_new: true
       state_changed_author: true
 ```
+
+`vendor/bin/contao-console workflow:dump entity_approvement | dot -Tpng -o vendor/heimrichhannot/contao-entity-approvement-bundle/docs/img/approvement-process.jpg`

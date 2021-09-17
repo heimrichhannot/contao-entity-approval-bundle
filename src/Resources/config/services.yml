@@ -6,10 +6,5 @@ services:
     bind:
       $bundleConfig: '%huh_entity_approvement%'
 
-  HeimrichHannot\EntityApprovementBundle\EventListener\Contao\LoadDataContainerListener: ~
-
-  HeimrichHannot\EntityApprovementBundle\Manager\:
-    resource: ../../Manager/*
-
-  HeimrichHannot\EntityApprovementBundle\DataContainer\:
-    resource: ../../DataContainer/*
+  HeimrichHannot\EntityApprovementBundle\:
+    resource: "../../{DataContainer,EventListener,EventSubscriber,Manager}/*"

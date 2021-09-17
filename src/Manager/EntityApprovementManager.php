@@ -8,20 +8,13 @@
 namespace HeimrichHannot\EntityApprovementBundle\Manager;
 
 use Contao\CoreBundle\DataContainer\PaletteManipulator;
-use Contao\DataContainer;
 use HeimrichHannot\EntityApprovementBundle\DataContainer\EntityApprovementContainer;
 use HeimrichHannot\UtilsBundle\Dca\DcaUtil;
 
 class EntityApprovementManager
 {
-    /**
-     * @var array
-     */
-    protected $bundleConfig;
-    /**
-     * @var DcaUtil
-     */
-    protected $dcaUtil;
+    protected array             $bundleConfig;
+    protected DcaUtil           $dcaUtil;
 
     public function __construct(DcaUtil $dcaUtil, array $bundleConfig)
     {
@@ -56,11 +49,8 @@ class EntityApprovementManager
         }
 
         $dca = &$GLOBALS['TL_DCA'][$table];
-        $dca['config']['onsubmit_callback'] = [EntityApprovementContainer::class, 'initWorkflow'];
-    }
-
-    public function initWorkflow(DataContainer $dc): void
-    {
+        $dca['config']['oncreate_callback'] = [[EntityApprovementContainer::class, 'startWorkflow']];
+//        $dca['config']['onsubmit_callback'] = [[EntityApprovementContainer::class, 'applyWorkflowState']];
     }
 
     private function addApprovementFieldsToDca(string $table): void
@@ -76,6 +66,7 @@ class EntityApprovementManager
                 'inputType' => 'checkbox',
                 'options_callback' => [EntityApprovementContainer::class, 'getAuditors'],
                 'eval' => ['multiple' => true, 'mandatory' => false, 'tl_class' => 'clr w50'],
+                'save_callback' => [[EntityApprovementContainer::class, 'onAuditorsSave']],
                 'attributes' => ['legend' => 'publish_legend', 'fe_sorting' => true, 'fe_search' => true],
                 'sql' => 'blob NULL',
             ],
