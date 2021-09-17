@@ -89,7 +89,7 @@ class EntityApprovementManager
                 'reference' => &$GLOBALS['TL_LANG']['MSC']['approvement_state'],
                 'eval' => ['mandatory' => false, 'tl_class' => 'w50'],
                 'attributes' => ['legend' => 'publish_legend', 'fe_sorting' => true, 'fe_search' => true],
-                'sql' => 'blob NULL',
+                'sql' => "varchar(32) NOT NULL default ''",
             ],
             'huhApprovement_notes' => [
                 'label' => &$GLOBALS['TL_LANG']['MSC']['approvement_notes'],
