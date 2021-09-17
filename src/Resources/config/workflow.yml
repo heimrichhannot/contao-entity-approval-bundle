@@ -7,20 +7,23 @@ framework:
       marking_store:
         type: 'single_state'
         arguments:
-          - 'state'
+          - 'huhApprovement_state'
       supports:
         - Contao\Model
-      initial_place: submit
+      initial_marking: wait_for_initial_auditor
       places:
-        - submit
+        - wait_for_initial_auditor
         - in_progress
         - changes_requested
         - approved
         - rejected
       transitions:
         assign_auditor:
-          from: submit
+          from: wait_for_initial_auditor
           to: in_progress
+        wait_for_initial_auditor:
+          from: in_progress
+          to: wait_for_initial_auditor
         approve:
           from: in_progress
           to: approved

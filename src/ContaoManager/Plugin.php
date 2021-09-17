@@ -39,5 +39,6 @@ class Plugin implements BundlePluginInterface, ConfigPluginInterface
     public function registerContainerConfiguration(LoaderInterface $loader, array $managerConfig)
     {
         $loader->load('@HeimrichHannotEntityApprovementBundle/Resources/config/services.yml');
+        $loader->load('@HeimrichHannotEntityApprovementBundle/Resources/config/workflow.yml');
     }
 }
