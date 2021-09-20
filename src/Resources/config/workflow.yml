@@ -31,7 +31,7 @@ framework:
           from: in_progress
           to: rejected
         request_change:
-          from: in_progress
+          from: [in_progress, rejected, approved]
           to: changes_requested
         apply_change:
           from: changes_requested

@@ -12,16 +12,19 @@ use Contao\StringUtil;
 use HeimrichHannot\EntityApprovementBundle\DataContainer\EntityApprovementContainer;
 use HeimrichHannot\EntityApprovementBundle\DependencyInjection\Configuration;
 use Symfony\Component\Workflow\WorkflowInterface;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 class EntityApprovementWorkflowManager
 {
-    protected array             $bundleConfig;
-    protected WorkflowInterface $entityApprovementStateMachine;
+    protected array               $bundleConfig;
+    protected WorkflowInterface   $entityApprovementStateMachine;
+    protected TranslatorInterface $translator;
 
-    public function __construct(WorkflowInterface $entityApprovementStateMachine, array $bundleConfig)
+    public function __construct(TranslatorInterface $translator, WorkflowInterface $entityApprovementStateMachine, array $bundleConfig)
     {
         $this->bundleConfig = $bundleConfig;
         $this->entityApprovementStateMachine = $entityApprovementStateMachine;
+        $this->translator = $translator;
     }
 
     public function startWorkflow(Model $model): void
@@ -34,11 +37,25 @@ class EntityApprovementWorkflowManager
         }
     }
 
+    public function isTransitionPossible($value, Model $model): bool
+    {
+        $enabledTransitions = $this->entityApprovementStateMachine->getEnabledTransitions($model);
+
+        foreach ($enabledTransitions as $transition) {
+            if (\in_array($value, $transition->getTos())) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public function workflowAuditorChange($value, Model $model): void
     {
         //if $value null and workflow is allowed -> state wait_for_initial_auditor
         if (null === $value && $this->entityApprovementStateMachine->can($model, EntityApprovementContainer::APPROVEMENT_TRANSITION_REMOVE_ALL_AUDITORS)) {
             $this->entityApprovementStateMachine->apply($model, EntityApprovementContainer::APPROVEMENT_TRANSITION_REMOVE_ALL_AUDITORS);
+
             $model->save();
 
             $this->sendMails(EntityApprovementContainer::APPROVEMENT_TRANSITION_REMOVE_ALL_AUDITORS, $model::getTable(), []);
@@ -55,14 +72,7 @@ class EntityApprovementWorkflowManager
             $this->sendMails(EntityApprovementContainer::APPROVEMENT_TRANSITION_ASSIGN_AUDITOR, $model::getTable(), []);
         }
 
-        if (null !== $value &&
-             $this->entityApprovementStateMachine->can($model, EntityApprovementContainer::APPROVEMENT_STATE_IN_PROGRESS)
-        ) {
-            $this->entityApprovementStateMachine->apply($model, EntityApprovementContainer::APPROVEMENT_STATE_IN_PROGRESS);
-            $model->huhApprovement_state = EntityApprovementContainer::APPROVEMENT_STATE_IN_PROGRESS;
-            $model->save();
-
-            // this array contains already saved auditor groups("former") if existing, and also groups just assigned("new")
+        if (null !== $value && $value !== $model->huhApprovement_auditor) {
             $auditors = [
                 'former_auditor' => StringUtil::deserialize($model->huhApprovement_auditor, true),
                 'new_auditor' => StringUtil::deserialize($value, true),
@@ -71,6 +81,28 @@ class EntityApprovementWorkflowManager
 
             $this->sendMails(EntityApprovementContainer::APPROVEMENT_STATE_IN_PROGRESS, $model::getTable(), $auditors);
         }
+    }
+
+    public function workflowNotesChange($value, Model $model): void
+    {
+        if (null !== $value) {
+        }
+    }
+
+    public function getTransitionBlockerMessages(Model $model): array
+    {
+        $list = [];
+
+        $transitions = $this->entityApprovementStateMachine->getEnabledTransitions($model);
+
+        foreach ($transitions as $transition) {
+            $list[] = $this->entityApprovementStateMachine->buildTransitionBlockerList($model, $transition->getName());
+            $this->entityApprovementStateMachine->getMetadataStore();
+            $this->entityApprovementStateMachine->getMarking($model);
+            $this->entityApprovementStateMachine->getMarkingStore()->getMarking($model);
+        }
+
+        return [];
     }
 
     public function sendMails(string $state, string $table, array $involved): void

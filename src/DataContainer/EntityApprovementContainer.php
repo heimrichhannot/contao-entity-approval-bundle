@@ -11,6 +11,9 @@ use Contao\DataContainer;
 use HeimrichHannot\EntityApprovementBundle\Manager\EntityApprovementWorkflowManager;
 use HeimrichHannot\UtilsBundle\Database\DatabaseUtil;
 use HeimrichHannot\UtilsBundle\Model\ModelUtil;
+use Symfony\Component\Translation\TranslatorInterface;
+use Symfony\Component\Workflow\Exception\TransitionException;
+use Symfony\Component\Workflow\WorkflowInterface;
 
 class EntityApprovementContainer
 {
@@ -22,6 +25,13 @@ class EntityApprovementContainer
 
     const APPROVEMENT_STATES = [
         self::APPROVEMENT_STATE_WAIT_FOR_INITIAL_AUDITOR,
+        self::APPROVEMENT_STATE_IN_PROGRESS,
+        self::APPROVEMENT_STATE_CHANGES_REQUESTED,
+        self::APPROVEMENT_STATE_APPROVED,
+        self::APPROVEMENT_STATE_REJECTED,
+    ];
+
+    const APPROVEMENT_ENTITY_STATES = [
         self::APPROVEMENT_STATE_IN_PROGRESS,
         self::APPROVEMENT_STATE_CHANGES_REQUESTED,
         self::APPROVEMENT_STATE_APPROVED,
@@ -47,18 +57,24 @@ class EntityApprovementContainer
     protected array                            $bundleConfig;
     protected DatabaseUtil                     $databaseUtil;
     protected EntityApprovementWorkflowManager $workflowManager;
-    protected ModelUtil $modelUtil;
+    protected ModelUtil                        $modelUtil;
+    protected WorkflowInterface                $entityApprovementStateMachine;
+    protected TranslatorInterface              $translator;
 
     public function __construct(
         DatabaseUtil $databaseUtil,
         ModelUtil $modelUtil,
         EntityApprovementWorkflowManager $workflowManager,
-        array $bundleConfig
+        array $bundleConfig,
+        WorkflowInterface $entityApprovementStateMachine,
+        TranslatorInterface $translator
     ) {
         $this->bundleConfig = $bundleConfig;
         $this->databaseUtil = $databaseUtil;
         $this->workflowManager = $workflowManager;
         $this->modelUtil = $modelUtil;
+        $this->entityApprovementStateMachine = $entityApprovementStateMachine;
+        $this->translator = $translator;
     }
 
     public function getAuditors(?DataContainer $dc): array
@@ -84,16 +100,48 @@ class EntityApprovementContainer
         $this->workflowManager->startWorkflow($model);
     }
 
-    public function applyWorkflowState(DataContainer $dc): void
-    {
-        $model = $this->modelUtil->findModelInstanceByPk($dc->table, $dc->id);
-//        $this->workflowManager->workflowStateChange($model);
-    }
-
     public function onAuditorsSave($value, DataContainer $dc)
     {
         $model = $this->modelUtil->findModelInstanceByPk($dc->table, $dc->id);
         $this->workflowManager->workflowAuditorChange($value, $model);
+
+        return $value;
+    }
+
+    public function onStateSave($value, DataContainer $dc)
+    {
+        $model = $this->modelUtil->findModelInstanceByPk($dc->table, $dc->id);
+        $transitionName = '';
+
+        foreach ($this->entityApprovementStateMachine->getDefinition()->getTransitions() as $transition) {
+            if (\in_array($model->huhApprovement_state, $transition->getFroms()) && \in_array($value, $transition->getTos())) {
+                $transitionName = $transition->getName();
+            }
+        }
+
+        if (!empty($transitionName)) {
+            if ($this->entityApprovementStateMachine->can($model, $transitionName)) {
+                $this->entityApprovementStateMachine->apply($model, $transitionName);
+            } else {
+                throw new TransitionException($model, $transitionName, $this->entityApprovementStateMachine, 'test');
+            }
+        } else {
+            $message = sprintf(
+                $this->translator->trans('huh.entity_approvement.bocking.transition_not_allowed'),
+                $GLOBALS['TL_LANG']['MSC']['approvement_state'][$model->huhApprovement_state],
+                $GLOBALS['TL_LANG']['MSC']['approvement_state'][$value]
+            );
+
+            throw new \Exception($message);
+        }
+
+        return $value;
+    }
+
+    public function onNotesSave($value, DataContainer $dc)
+    {
+        $model = $this->modelUtil->findModelInstanceByPk($dc->table, $dc->id);
+//        $this->workflowManager->workflowNotesChange($value, $model);
 
         return $value;
     }
