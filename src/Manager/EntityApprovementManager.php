@@ -50,7 +50,7 @@ class EntityApprovementManager
 
         $dca = &$GLOBALS['TL_DCA'][$table];
         $dca['config']['oncreate_callback'] = [[EntityApprovementContainer::class, 'startWorkflow']];
-//        $dca['config']['onsubmit_callback'] = [[EntityApprovementContainer::class, 'applyWorkflowState']];
+        $dca['config']['onsubmit_callback'] = [[EntityApprovementContainer::class, 'saveWorkflowEntity']];
     }
 
     private function addApprovementFieldsToDca(string $table): void

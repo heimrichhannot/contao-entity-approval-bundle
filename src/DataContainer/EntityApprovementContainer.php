@@ -7,6 +7,7 @@
 
 namespace HeimrichHannot\EntityApprovementBundle\DataContainer;
 
+use Contao\Database\Result;
 use Contao\DataContainer;
 use HeimrichHannot\EntityApprovementBundle\Manager\EntityApprovementWorkflowManager;
 use HeimrichHannot\UtilsBundle\Database\DatabaseUtil;
@@ -111,6 +112,11 @@ class EntityApprovementContainer
     public function onStateSave($value, DataContainer $dc)
     {
         $model = $this->modelUtil->findModelInstanceByPk($dc->table, $dc->id);
+
+        if ($value === $model->huhApprovement_state) {
+            return $value;
+        }
+
         $transitionName = '';
 
         foreach ($this->entityApprovementStateMachine->getDefinition()->getTransitions() as $transition) {
@@ -144,5 +150,15 @@ class EntityApprovementContainer
 //        $this->workflowManager->workflowNotesChange($value, $model);
 
         return $value;
+    }
+
+    public function saveWorkflowEntity(DataContainer $dc): void
+    {
+        /** @var Result $active */
+        $active = $dc->activeRecord;
+
+        if ('1' === $active->row()['published']) {
+            // check if publishing is allowed
+        }
     }
 }
