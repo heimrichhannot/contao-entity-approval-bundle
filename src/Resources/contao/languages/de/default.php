@@ -16,6 +16,7 @@ $GLOBALS['TL_LANG']['MSC']['approvement_notes'][1] = 'Teilen Sie hier Ihre Anmer
 $GLOBALS['TL_LANG']['MSC']['approvement_informAuthor'][0] = 'Den Author benachrichtigen';
 $GLOBALS['TL_LANG']['MSC']['approvement_informAuthor'][1] = 'Wählen Sie das aus, wenn der Author über Statusänderungen informiert werden soll.';
 
+$GLOBALS['TL_LANG']['MSC']['approvement_state'][EntityApprovementContainer::APPROVEMENT_STATE_WAIT_FOR_INITIAL_AUDITOR] = 'Warten auf Zuordnung';
 $GLOBALS['TL_LANG']['MSC']['approvement_state'][EntityApprovementContainer::APPROVEMENT_STATE_IN_PROGRESS] = 'In Arbeit';
 $GLOBALS['TL_LANG']['MSC']['approvement_state'][EntityApprovementContainer::APPROVEMENT_STATE_CHANGES_REQUESTED] = 'Änderungen angefordert';
 $GLOBALS['TL_LANG']['MSC']['approvement_state'][EntityApprovementContainer::APPROVEMENT_STATE_APPROVED] = 'Freigegeben';

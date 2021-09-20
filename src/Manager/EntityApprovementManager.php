@@ -80,7 +80,7 @@ class EntityApprovementManager
                 'reference' => &$GLOBALS['TL_LANG']['MSC']['approvement_state'],
                 'eval' => ['mandatory' => false, 'tl_class' => 'w50'],
                 'attributes' => ['legend' => 'publish_legend', 'fe_sorting' => true, 'fe_search' => true],
-                'sql' => "varchar(32) NOT NULL default ''",
+                'sql' => "varchar(32) NOT NULL default '".EntityApprovementContainer::APPROVEMENT_STATE_WAIT_FOR_INITIAL_AUDITOR."'",
             ],
             'huhApprovement_notes' => [
                 'label' => &$GLOBALS['TL_LANG']['MSC']['approvement_notes'],

@@ -36,16 +36,28 @@ class EntityApprovementWorkflowManager
 
     public function workflowAuditorChange($value, Model $model): void
     {
-        //wenn $value null -> state wait_for_initial_auditor
-        if (null === $value && $this->entityApprovementStateMachine->can($model, EntityApprovementContainer::APPROVEMENT_STATE_WAIT_FOR_INITIAL_AUDITOR)) {
-            $this->entityApprovementStateMachine->apply($model, EntityApprovementContainer::APPROVEMENT_STATE_WAIT_FOR_INITIAL_AUDITOR);
-            $model->huhApprovement_state = EntityApprovementContainer::APPROVEMENT_STATE_WAIT_FOR_INITIAL_AUDITOR;
+        //if $value null and workflow is allowed -> state wait_for_initial_auditor
+        if (null === $value && $this->entityApprovementStateMachine->can($model, EntityApprovementContainer::APPROVEMENT_TRANSITION_REMOVE_ALL_AUDITORS)) {
+            $this->entityApprovementStateMachine->apply($model, EntityApprovementContainer::APPROVEMENT_TRANSITION_REMOVE_ALL_AUDITORS);
             $model->save();
 
-            $this->sendMails(EntityApprovementContainer::APPROVEMENT_STATE_WAIT_FOR_INITIAL_AUDITOR, $model::getTable(), []);
+            $this->sendMails(EntityApprovementContainer::APPROVEMENT_TRANSITION_REMOVE_ALL_AUDITORS, $model::getTable(), []);
         }
 
-        if (null !== $value && $this->entityApprovementStateMachine->can($model, EntityApprovementContainer::APPROVEMENT_STATE_IN_PROGRESS)) {
+        // if value not null and workflow is allowed -> state in_progress
+        if (null === $model->huhApprovement_auditors &&
+             null !== $value &&
+             $this->entityApprovementStateMachine->can($model, EntityApprovementContainer::APPROVEMENT_TRANSITION_ASSIGN_AUDITOR)
+        ) {
+            $this->entityApprovementStateMachine->apply($model, EntityApprovementContainer::APPROVEMENT_TRANSITION_ASSIGN_AUDITOR);
+            $model->save();
+
+            $this->sendMails(EntityApprovementContainer::APPROVEMENT_TRANSITION_ASSIGN_AUDITOR, $model::getTable(), []);
+        }
+
+        if (null !== $value &&
+             $this->entityApprovementStateMachine->can($model, EntityApprovementContainer::APPROVEMENT_STATE_IN_PROGRESS)
+        ) {
             $this->entityApprovementStateMachine->apply($model, EntityApprovementContainer::APPROVEMENT_STATE_IN_PROGRESS);
             $model->huhApprovement_state = EntityApprovementContainer::APPROVEMENT_STATE_IN_PROGRESS;
             $model->save();

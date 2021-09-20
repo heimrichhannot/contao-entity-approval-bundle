@@ -28,6 +28,22 @@ class EntityApprovementContainer
         self::APPROVEMENT_STATE_REJECTED,
     ];
 
+    const APPROVEMENT_TRANSITION_ASSIGN_AUDITOR = 'assign_auditor';
+    const APPROVEMENT_TRANSITION_REMOVE_ALL_AUDITORS = 'remove_all_auditors';
+    const APPROVEMENT_TRANSITION_APPROVE = 'approve';
+    const APPROVEMENT_TRANSITION_REJECT = 'reject';
+    const APPROVEMENT_TRANSITION_REQUEST_CHANGE = 'request_change';
+    const APPROVEMENT_TRANSITION_APPLY_CHANGE = 'apply_change';
+
+    const APPROVEMENT_TRANSITIONS = [
+        self::APPROVEMENT_TRANSITION_ASSIGN_AUDITOR,
+        self::APPROVEMENT_TRANSITION_REMOVE_ALL_AUDITORS,
+        self::APPROVEMENT_TRANSITION_APPROVE,
+        self::APPROVEMENT_TRANSITION_REJECT,
+        self::APPROVEMENT_TRANSITION_REQUEST_CHANGE,
+        self::APPROVEMENT_TRANSITION_APPLY_CHANGE,
+    ];
+
     protected array                            $bundleConfig;
     protected DatabaseUtil                     $databaseUtil;
     protected EntityApprovementWorkflowManager $workflowManager;
@@ -71,7 +87,7 @@ class EntityApprovementContainer
     public function applyWorkflowState(DataContainer $dc): void
     {
         $model = $this->modelUtil->findModelInstanceByPk($dc->table, $dc->id);
-        $this->workflowManager->workflowStateChange($model);
+//        $this->workflowManager->workflowStateChange($model);
     }
 
     public function onAuditorsSave($value, DataContainer $dc)

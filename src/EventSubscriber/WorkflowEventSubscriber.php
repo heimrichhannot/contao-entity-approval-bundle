@@ -16,13 +16,13 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
     public function getSubscribedEvents()
     {
         return [
-            LeaveEvent::class => ['onWorkflowLeave'],
-            GuardEvent::class => ['onWorkflowGuard'],
-            'workflow.entity_approvement.guard.wait_for_initial_auditor' => ['onWorkflowGuard'],
-            'workflow.entity_approvement.guard.in_progress' => ['onWorkflowGuard'],
-            'workflow.entity_approvement.guard.changes_requested' => ['onWorkflowGuard'],
-            'workflow.entity_approvement.guard.approved' => ['onWorkflowGuard'],
-            'workflow.entity_approvement.guard.rejected' => ['onWorkflowGuard'],
+//            LeaveEvent::class => ['onWorkflowLeave'],
+//            GuardEvent::class => ['onWorkflowGuard'],
+//            'workflow.entity_approvement.guard.wait_for_initial_auditor' => ['onWorkflowGuard'],
+//            'workflow.entity_approvement.guard.in_progress' => ['onWorkflowGuard'],
+//            'workflow.entity_approvement.guard.changes_requested' => ['onWorkflowGuard'],
+//            'workflow.entity_approvement.guard.approved' => ['onWorkflowGuard'],
+//            'workflow.entity_approvement.guard.rejected' => ['onWorkflowGuard'],
         ];
     }
 

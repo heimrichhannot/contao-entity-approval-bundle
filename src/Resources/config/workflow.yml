@@ -21,7 +21,7 @@ framework:
         assign_auditor:
           from: wait_for_initial_auditor
           to: in_progress
-        wait_for_initial_auditor:
+        remove_all_auditors:
           from: in_progress
           to: wait_for_initial_auditor
         approve:
