@@ -139,10 +139,6 @@ class EntityApprovementWorkflowManager
 
                 break;
 
-            case EntityApprovementContainer::APPROVEMENT_STATE_CHANGES_REQUESTED:
-
-                break;
-
             default:
                 break;
         }
