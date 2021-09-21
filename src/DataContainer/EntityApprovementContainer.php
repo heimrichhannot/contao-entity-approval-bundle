@@ -7,11 +7,11 @@
 
 namespace HeimrichHannot\EntityApprovementBundle\DataContainer;
 
-use Contao\Database\Result;
 use Contao\DataContainer;
 use HeimrichHannot\EntityApprovementBundle\Manager\EntityApprovementWorkflowManager;
 use HeimrichHannot\UtilsBundle\Database\DatabaseUtil;
 use HeimrichHannot\UtilsBundle\Model\ModelUtil;
+use HeimrichHannot\UtilsBundle\User\UserUtil;
 use Symfony\Component\Translation\TranslatorInterface;
 use Symfony\Component\Workflow\Exception\TransitionException;
 use Symfony\Component\Workflow\WorkflowInterface;
@@ -61,10 +61,12 @@ class EntityApprovementContainer
     protected ModelUtil                        $modelUtil;
     protected WorkflowInterface                $entityApprovementStateMachine;
     protected TranslatorInterface              $translator;
+    protected UserUtil                         $userUtil;
 
     public function __construct(
         DatabaseUtil $databaseUtil,
         ModelUtil $modelUtil,
+        UserUtil $userUtil,
         EntityApprovementWorkflowManager $workflowManager,
         array $bundleConfig,
         WorkflowInterface $entityApprovementStateMachine,
@@ -76,6 +78,7 @@ class EntityApprovementContainer
         $this->modelUtil = $modelUtil;
         $this->entityApprovementStateMachine = $entityApprovementStateMachine;
         $this->translator = $translator;
+        $this->userUtil = $userUtil;
     }
 
     public function getAuditors(?DataContainer $dc): array
@@ -95,12 +98,6 @@ class EntityApprovementContainer
         return $options;
     }
 
-    public function startWorkflow(string $table, int $insertId, array $fields, DataContainer $dc): void
-    {
-        $model = $this->modelUtil->findModelInstanceByPk($table, $insertId);
-        $this->workflowManager->startWorkflow($model);
-    }
-
     public function onAuditorsSave($value, DataContainer $dc)
     {
         $model = $this->modelUtil->findModelInstanceByPk($dc->table, $dc->id);
@@ -112,53 +109,64 @@ class EntityApprovementContainer
     public function onStateSave($value, DataContainer $dc)
     {
         $model = $this->modelUtil->findModelInstanceByPk($dc->table, $dc->id);
+        $activeRecord = $dc->activeRecord->row();
 
-        if ($value === $model->huhApprovement_state) {
+        if ($value === $activeRecord['huhApprovement_state'] || $this->userUtil->isAdmin()) {
+            return $value;
+        }
+        $currentState = $activeRecord['huhApprovement_state'];
+        $transitionName = $this->workflowManager->getTransitionName($currentState, $value);
+
+        if (empty($transitionName)) {
+            $message = sprintf(
+                $this->translator->trans('huh.entity_approvement.bocking.transition_not_allowed'),
+                $GLOBALS['TL_LANG']['MSC']['approvement_state'][$currentState],
+                $GLOBALS['TL_LANG']['MSC']['approvement_state'][$value]
+            );
+
+            throw new TransitionException($model, $transitionName, $this->entityApprovementStateMachine, $message);
+        }
+
+        if ($currentState !== static::APPROVEMENT_STATE_APPROVED && $activeRecord[$this->bundleConfig[$dc->table]['publish_field']] === ($this->bundleConfig[$dc->table]['invert_publish_field'] ? '0' : '1')) {
+            $value = $this->bundleConfig[$dc->table]['invert_publish_field'] ? '1' : '0';
+            $this->databaseUtil->update(
+                $dc->table,
+                [$dc->table.'.'.$this->bundleConfig[$dc->table]['publish_field'].'='.$value],
+                $dc->table.'.id='.$activeRecord['id']);
+        }
+
+        return $value;
+    }
+
+    public function onPublish($value, DataContainer $dc)
+    {
+        //Admin still can publish event without workflow
+        if ($this->userUtil->isAdmin() || ($this->bundleConfig[$dc->table]['invert_publish_field'] && '1' === $value) || (!$this->bundleConfig[$dc->table]['invert_publish_field'] && '0' === $value)) {
             return $value;
         }
 
-        $transitionName = '';
+        $activeRecord = $dc->activeRecord->row();
 
-        foreach ($this->entityApprovementStateMachine->getDefinition()->getTransitions() as $transition) {
-            if (\in_array($model->huhApprovement_state, $transition->getFroms()) && \in_array($value, $transition->getTos())) {
-                $transitionName = $transition->getName();
-            }
-        }
+        $state = $activeRecord['huhApprovement_state'];
 
-        if (!empty($transitionName)) {
-            if ($this->entityApprovementStateMachine->can($model, $transitionName)) {
-                $this->entityApprovementStateMachine->apply($model, $transitionName);
-            } else {
-                throw new TransitionException($model, $transitionName, $this->entityApprovementStateMachine, 'test');
-            }
-        } else {
+        if ($value === ($this->bundleConfig[$dc->table]['invert_publish_field'] ? '0' : '1') && $state !== static::APPROVEMENT_STATE_APPROVED) {
+            $unpublishValue = $this->bundleConfig[$dc->table]['invert_publish_field'] ? '1' : '0';
+
+            $this->databaseUtil->update(
+                $dc->table,
+                [$dc->table.'.'.$this->bundleConfig[$dc->table]['publish_field'] => $unpublishValue],
+                $dc->table.'.id=?',
+                [$dc->id]);
+
             $message = sprintf(
-                $this->translator->trans('huh.entity_approvement.bocking.transition_not_allowed'),
-                $GLOBALS['TL_LANG']['MSC']['approvement_state'][$model->huhApprovement_state],
-                $GLOBALS['TL_LANG']['MSC']['approvement_state'][$value]
+                $this->translator->trans('huh.entity_approvement.bocking.publishing_blocked'),
+                $GLOBALS['TL_LANG']['MSC']['approvement_state'][static::APPROVEMENT_STATE_APPROVED],
+                $GLOBALS['TL_LANG']['MSC']['approvement_state'][$state]
             );
 
             throw new \Exception($message);
         }
 
         return $value;
-    }
-
-    public function onNotesSave($value, DataContainer $dc)
-    {
-        $model = $this->modelUtil->findModelInstanceByPk($dc->table, $dc->id);
-//        $this->workflowManager->workflowNotesChange($value, $model);
-
-        return $value;
-    }
-
-    public function saveWorkflowEntity(DataContainer $dc): void
-    {
-        /** @var Result $active */
-        $active = $dc->activeRecord;
-
-        if ('1' === $active->row()['published']) {
-            // check if publishing is allowed
-        }
     }
 }

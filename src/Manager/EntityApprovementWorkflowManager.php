@@ -7,15 +7,21 @@
 
 namespace HeimrichHannot\EntityApprovementBundle\Manager;
 
+use Contao\Environment;
 use Contao\Model;
 use Contao\StringUtil;
 use HeimrichHannot\EntityApprovementBundle\DataContainer\EntityApprovementContainer;
 use HeimrichHannot\EntityApprovementBundle\DependencyInjection\Configuration;
+use HeimrichHannot\EntityApprovementBundle\Dto\NotificationCenterOptionsDto;
+use NotificationCenter\Model\Notification;
 use Symfony\Component\Workflow\WorkflowInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 class EntityApprovementWorkflowManager
 {
+    const NOTIFICATION_TYPE_AUDITOR_CHANGED = 'huh_entity_approvement_auditor_changed';
+    const NOTIFICATION_TYPE_STATE_CHANGED = 'huh_entity_approvement_state_changed';
+
     protected array               $bundleConfig;
     protected WorkflowInterface   $entityApprovementStateMachine;
     protected TranslatorInterface $translator;
@@ -25,16 +31,6 @@ class EntityApprovementWorkflowManager
         $this->bundleConfig = $bundleConfig;
         $this->entityApprovementStateMachine = $entityApprovementStateMachine;
         $this->translator = $translator;
-    }
-
-    public function startWorkflow(Model $model): void
-    {
-        if (null === $model->row()['huhApprovement_auditor']) {
-//            $this->entityApprovementStateMachine->getEnabledTransitions($model);
-//            $this->entityApprovementStateMachine->apply($model, EntityApprovementContainer::APPROVEMENT_STATE_WAIT_FOR_INITIAL_AUDITOR);
-//            $model->huhApprovement_state = EntityApprovementContainer::APPROVEMENT_STATE_WAIT_FOR_INITIAL_AUDITOR;
-            $model->save();
-        }
     }
 
     public function isTransitionPossible($value, Model $model): bool
@@ -50,15 +46,35 @@ class EntityApprovementWorkflowManager
         return false;
     }
 
+    public function getTransitionName(string $from, string $to): string
+    {
+        $name = '';
+
+        foreach ($this->entityApprovementStateMachine->getDefinition()->getTransitions() as $transition) {
+            if (\in_array($from, $transition->getFroms()) && \in_array($to, $transition->getTos())) {
+                $name = $transition->getName();
+            }
+        }
+
+        return $name;
+    }
+
     public function workflowAuditorChange($value, Model $model): void
     {
-        //if $value null and workflow is allowed -> state wait_for_initial_auditor
+        $options = new NotificationCenterOptionsDto();
+        $options->table = $model::getTable();
+        $options->author = $model->__get($this->bundleConfig[$model::getTable()]['author_field']);
+        $options->auditorFormer = StringUtil::deserialize($model->huhApprovement_auditor, true);
+        $options->auditorNew = StringUtil::deserialize($value, true);
+        $options->state = EntityApprovementContainer::APPROVEMENT_STATE_WAIT_FOR_INITIAL_AUDITOR;
+
+        //if value null and workflow is allowed -> state wait_for_initial_auditor
         if (null === $value && $this->entityApprovementStateMachine->can($model, EntityApprovementContainer::APPROVEMENT_TRANSITION_REMOVE_ALL_AUDITORS)) {
             $this->entityApprovementStateMachine->apply($model, EntityApprovementContainer::APPROVEMENT_TRANSITION_REMOVE_ALL_AUDITORS);
-
             $model->save();
 
-            $this->sendMails(EntityApprovementContainer::APPROVEMENT_TRANSITION_REMOVE_ALL_AUDITORS, $model::getTable(), []);
+            $options->state = EntityApprovementContainer::APPROVEMENT_TRANSITION_REMOVE_ALL_AUDITORS;
+            $this->sendMails($options);
         }
 
         // if value not null and workflow is allowed -> state in_progress
@@ -69,77 +85,56 @@ class EntityApprovementWorkflowManager
             $this->entityApprovementStateMachine->apply($model, EntityApprovementContainer::APPROVEMENT_TRANSITION_ASSIGN_AUDITOR);
             $model->save();
 
-            $this->sendMails(EntityApprovementContainer::APPROVEMENT_TRANSITION_ASSIGN_AUDITOR, $model::getTable(), []);
+            $options->state = EntityApprovementContainer::APPROVEMENT_TRANSITION_ASSIGN_AUDITOR;
+            $this->sendMails($options);
         }
 
         if (null !== $value && $value !== $model->huhApprovement_auditor) {
-            $auditors = [
-                'former_auditor' => StringUtil::deserialize($model->huhApprovement_auditor, true),
-                'new_auditor' => StringUtil::deserialize($value, true),
-                'author' => $model[$this->bundleConfig[$model::getTable()]['author_field']],
-            ];
-
-            $this->sendMails(EntityApprovementContainer::APPROVEMENT_STATE_IN_PROGRESS, $model::getTable(), $auditors);
+            $options->state = EntityApprovementContainer::APPROVEMENT_STATE_IN_PROGRESS;
+            $this->sendMails($options);
         }
     }
 
-    public function workflowNotesChange($value, Model $model): void
+    public function sendMails(NotificationCenterOptionsDto $options): void
     {
-        if (null !== $value) {
-        }
-    }
-
-    public function getTransitionBlockerMessages(Model $model): array
-    {
-        $list = [];
-
-        $transitions = $this->entityApprovementStateMachine->getEnabledTransitions($model);
-
-        foreach ($transitions as $transition) {
-            $list[] = $this->entityApprovementStateMachine->buildTransitionBlockerList($model, $transition->getName());
-            $this->entityApprovementStateMachine->getMetadataStore();
-            $this->entityApprovementStateMachine->getMarking($model);
-            $this->entityApprovementStateMachine->getMarkingStore()->getMarking($model);
+        if ($this->bundleConfig[$options->table]['emails']['state_changed_author'] && isset($options->author)) {
+            $options->recipients = [$options->author];
+            $this->sendMail($options);
         }
 
-        return [];
-    }
-
-    public function sendMails(string $state, string $table, array $involved): void
-    {
-        if ($this->bundleConfig[$table]['emails']['state_changed_author'] && isset($involved['author'])) {
-            $this->sendMail($involved['author']);
-        }
-
-        switch ($state) {
+        switch ($options->state) {
             case EntityApprovementContainer::APPROVEMENT_STATE_WAIT_FOR_INITIAL_AUDITOR:
-                $initialAuditors = explode(',', $this->bundleConfig[$table]['initial_auditor_groups']);
+                $initialAuditors = explode(',', $this->bundleConfig[$options->table]['initial_auditor_groups']);
 
                 if (empty($initialAuditors)) {
                     return;
                 }
 
-                if ($this->bundleConfig[$table]['initial_auditor_mode'][Configuration::AUDITOR_MODE_RANDOM]) {
+                if ($this->bundleConfig[$options->table]['initial_auditor_mode'][Configuration::AUDITOR_MODE_RANDOM]) {
                     //send mails to all initial auditors
-                    $this->sendMail($initialAuditors);
-                } elseif ($this->bundleConfig[$table]['initial_auditor_mode'][Configuration::AUDITOR_MODE_ALL]) {
+                    $options->recipients = $initialAuditors;
+                    $this->sendMail($options);
+                } elseif ($this->bundleConfig[$options->table]['initial_auditor_mode'][Configuration::AUDITOR_MODE_ALL]) {
                     //send mails to a random initial auditor
-                    $this->sendMail([$initialAuditors[array_rand($initialAuditors)]]);
+                    $options->recipients = [$initialAuditors[array_rand($initialAuditors)]];
+                    $this->sendMail($options);
                 }
 
                 break;
 
             case EntityApprovementContainer::APPROVEMENT_STATE_IN_PROGRESS:
-                $stayedAuditors = array_intersect($involved['former_auditor'], $involved['new_auditor']);
+                $stayedAuditors = array_intersect($options->auditorFormer, $options->auditorNew);
 
-                if ($this->bundleConfig[$table]['emails']['auditor_changed_former'] && !empty($involved['former_auditor'])) {
+                if ($this->bundleConfig[$options->table]['emails']['auditor_changed_former'] && !empty($options->auditorFormer)) {
                     //send mails to former auditors he is not an auditor anymore
-                    $this->sendMail(array_diff($involved['former_auditor'], $stayedAuditors));
+                    $options->recipients = array_diff($options->auditorFormer, $stayedAuditors);
+                    $this->sendMail($options);
                 }
 
-                if ($this->bundleConfig[$table]['emails']['auditor_changed_new'] && !empty($involved['new_auditor'])) {
+                if ($this->bundleConfig[$options->table]['emails']['auditor_changed_new'] && !empty($options->auditorNew)) {
                     //send mails to new auditors who was not auditor before
-                    $this->sendMail(array_diff($involved['new_auditor'], $stayedAuditors));
+                    $options->recipients = array_diff($options->auditorNew, $stayedAuditors);
+                    $this->sendMail($options);
                 }
 
                 break;
@@ -159,7 +154,28 @@ class EntityApprovementWorkflowManager
         }
     }
 
-    private function sendMail(array $recipients): void
+    private function sendMail(NotificationCenterOptionsDto $options): void
     {
+        $tokens = [];
+        $tokens['approvement_recipinets'] = $options->recipients;
+        $tokens['entity_url'] = Environment::get('url').'contao?do=submission&table='.$options->table.'&id='.$options->entityId.'&act=edit';
+
+        switch ($options->type) {
+            case static::NOTIFICATION_TYPE_AUDITOR_CHANGED:
+                break;
+
+            case static::NOTIFICATION_TYPE_STATE_CHANGED:
+                break;
+        }
+
+        $notificationCollection = Notification::findByType($options->type);
+
+        if (null !== $notificationCollection) {
+            while ($notificationCollection->next()) {
+                $notification = $notificationCollection->current();
+
+                $notification->send($tokens); // Language is optional
+            }
+        }
     }
 }
