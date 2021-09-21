@@ -8,6 +8,8 @@
 namespace HeimrichHannot\EntityApprovementBundle\DataContainer;
 
 use Contao\DataContainer;
+use Contao\StringUtil;
+use HeimrichHannot\EntityApprovementBundle\Dto\NotificationCenterOptionsDto;
 use HeimrichHannot\EntityApprovementBundle\Manager\EntityApprovementWorkflowManager;
 use HeimrichHannot\UtilsBundle\Database\DatabaseUtil;
 use HeimrichHannot\UtilsBundle\Model\ModelUtil;
@@ -111,9 +113,20 @@ class EntityApprovementContainer
         $model = $this->modelUtil->findModelInstanceByPk($dc->table, $dc->id);
         $activeRecord = $dc->activeRecord->row();
 
+        $options = new NotificationCenterOptionsDto();
+        $options->table = $dc->table;
+        $options->entityId = $dc->id;
+        $options->author = $model->__get($this->bundleConfig[$model::getTable()]['author_field']);
+        $options->recipients = StringUtil::deserialize($activeRecord['huhApprovement_auditor'], true);
+        $options->state = $value;
+        $options->type = EntityApprovementWorkflowManager::NOTIFICATION_TYPE_STATE_CHANGED;
+
         if ($value === $activeRecord['huhApprovement_state'] || $this->userUtil->isAdmin()) {
+            $this->workflowManager->sendMails($options);
+
             return $value;
         }
+
         $currentState = $activeRecord['huhApprovement_state'];
         $transitionName = $this->workflowManager->getTransitionName($currentState, $value);
 
@@ -134,6 +147,8 @@ class EntityApprovementContainer
                 [$dc->table.'.'.$this->bundleConfig[$dc->table]['publish_field'].'='.$value],
                 $dc->table.'.id='.$activeRecord['id']);
         }
+
+        $this->workflowManager->sendMails($options);
 
         return $value;
     }
