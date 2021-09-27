@@ -8,7 +8,7 @@
 namespace HeimrichHannot\EntityApprovementBundle\EventListener\Contao;
 
 use Contao\CoreBundle\ServiceAnnotation\Hook;
-use HeimrichHannot\EntityApprovementBundle\Manager\EntityApprovementManager;
+use HeimrichHannot\EntityApprovementBundle\Manager\DcaManager;
 
 /**
  * @Hook("loadDataContainer")
@@ -16,7 +16,7 @@ use HeimrichHannot\EntityApprovementBundle\Manager\EntityApprovementManager;
 class LoadDataContainerListener
 {
     /**
-     * @var EntityApprovementManager
+     * @var DcaManager
      */
     protected $manager;
     /**
@@ -24,7 +24,7 @@ class LoadDataContainerListener
      */
     private $config;
 
-    public function __construct(EntityApprovementManager $manager, array $bundleConfig)
+    public function __construct(DcaManager $manager, array $bundleConfig)
     {
         $this->manager = $manager;
         $this->config = $bundleConfig;

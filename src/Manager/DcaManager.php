@@ -11,7 +11,7 @@ use Contao\CoreBundle\DataContainer\PaletteManipulator;
 use HeimrichHannot\EntityApprovementBundle\DataContainer\EntityApprovementContainer;
 use HeimrichHannot\UtilsBundle\Dca\DcaUtil;
 
-class EntityApprovementManager
+class DcaManager
 {
     protected array             $bundleConfig;
     protected DcaUtil           $dcaUtil;
