@@ -32,6 +32,10 @@ class LoadDataContainerListener
 
     public function __invoke(string $table): void
     {
+        if ('tl_page' === $table) {
+            $this->manager->addApprovementConfigToPage();
+        }
+
         if (\in_array($table, array_keys($this->config))) {
             $this->manager->addApprovementToDca($table);
         }

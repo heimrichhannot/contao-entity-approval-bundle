@@ -8,3 +8,7 @@ services:
 
   HeimrichHannot\EntityApprovementBundle\:
     resource: "../../{DataContainer,EventListener,EventSubscriber,Manager}/*"
+
+doctrine:
+  orm:
+    auto_mapping: true

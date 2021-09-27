@@ -52,6 +52,44 @@ class DcaManager
         $dca['fields'][$this->bundleConfig[$table]['publish_field']]['save_callback'] = [[EntityApprovementContainer::class, 'onPublish']];
     }
 
+    public function addApprovementConfigToPage(): void
+    {
+        $dca = &$GLOBALS['TL_DCA']['tl_page'];
+
+        $dca['subpalettes']['activateEntityApprovement'] = 'entityApprovementConfig';
+        $dca['palettes']['__selector__'][] = 'activateEntityApprovement';
+
+        foreach ($dca['palettes'] as $paletteName => $palette) {
+            if (!\is_string($palette)) {
+                continue;
+            }
+
+            switch ($paletteName) {
+                case 'root':
+                case 'rootfallback':
+                    PaletteManipulator::create()
+                        ->addLegend('entity_approvement_legend', 'publish_legend', PaletteManipulator::POSITION_BEFORE)
+                        ->addField(['activateEntityApprovement'], 'entity_approvement_legend', PaletteManipulator::POSITION_APPEND)
+                        ->applyToPalette($paletteName, 'tl_page');
+
+                    break;
+
+                case 'regular':
+                    $this->dcaUtil->addOverridableFields(['overrideActivateEntityApprovement', 'overrideEntityApprovement'], 'tl_page', 'tl_page');
+
+                    PaletteManipulator::create()
+                        ->addLegend('entity_approvement_legend', 'publish_legend', PaletteManipulator::POSITION_BEFORE)
+                        ->addField(['overrideActivateEntityApprovement', 'overrideEntityApprovement'], 'entity_approvment_legend', PaletteManipulator::POSITION_APPEND)
+                        ->applyToPalette($paletteName, 'tl_page');
+
+                    break;
+
+                default:
+                    break;
+            }
+        }
+    }
+
     private function addApprovementFieldsToDca(string $table): void
     {
         $dca = &$GLOBALS['TL_DCA'][$table];
