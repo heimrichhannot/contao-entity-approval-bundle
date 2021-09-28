@@ -8,24 +8,25 @@
 namespace HeimrichHannot\EntityApprovementBundle\DataContainer;
 
 use Contao\DataContainer;
+use Contao\UserGroupModel;
+use Doctrine\ORM\EntityManagerInterface;
 use HeimrichHannot\EntityApprovementBundle\DependencyInjection\Configuration;
 use HeimrichHannot\UtilsBundle\Choice\DataContainerChoice;
-use HeimrichHannot\UtilsBundle\Choice\FieldChoice;
-use HeimrichHannot\UtilsBundle\Dca\DcaUtil;
 
 class PageContainer
 {
-    protected DcaUtil             $dcaUtil;
-    protected DataContainerChoice $dcChoice;
-    protected FieldChoice         $fieldChoice;
-    protected array               $bundleConfig;
+    protected DataContainerChoice    $dcChoice;
+    protected array                  $bundleConfig;
+    protected EntityManagerInterface $entityManager;
 
-    public function __construct(DcaUtil $dcaUtil, DataContainerChoice $dcChoice, FieldChoice $fieldChoice, array $bundleConfig)
+    public function __construct(
+        DataContainerChoice $dcChoice,
+        EntityManagerInterface $entityManager,
+        array $bundleConfig)
     {
-        $this->dcaUtil = $dcaUtil;
         $this->dcChoice = $dcChoice;
-        $this->fieldChoice = $fieldChoice;
         $this->bundleConfig = $bundleConfig;
+        $this->entityManager = $entityManager;
     }
 
     public function onSaveEntityApprovement($value, DataContainer $dc)
@@ -49,26 +50,22 @@ class PageContainer
         $tables = $this->dcChoice->getChoices();
         $configured = array_keys($this->bundleConfig);
 
-        return array_intersect($tables, $configured);
-    }
-
-    public function getAllFields(DataContainer $dc): array
-    {
-        return [];
-
-        return $this->fieldChoice->getChoices();
-    }
-
-    public function getInitialAuditorGroups(DataContainer $dc): array
-    {
-        $options = [];
-
-        return $options;
+        return array_values(array_intersect($tables, $configured));
     }
 
     public function getAuditorGroups(DataContainer $dc): array
     {
         $options = [];
+
+        $userGroups = UserGroupModel::findAll();
+
+        /** @var UserGroupModel $group */
+        foreach ($userGroups as $group) {
+            if (empty($group->name)) {
+                continue;
+            }
+            $options[$group->id] = $group->name;
+        }
 
         return $options;
     }

@@ -41,12 +41,12 @@ class EntityApprovementConfigElement extends AbstractGroupElementEntity
      */
     protected string $auditorGroups = '';
 
-    public function getEntity(): string
+    public function getEntityName(): string
     {
         return $this->entityName;
     }
 
-    public function setEntity(string $entityName): void
+    public function setEntityName(string $entityName): void
     {
         $this->entityName = $entityName;
     }

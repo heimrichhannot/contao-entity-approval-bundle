@@ -25,13 +25,13 @@ $fields = [
         'min' => 1,
         'palette' => [
             'entityName',
-            'initial_auditor_groups',
-            'initial_auditor_mode',
-            'auditor_groups',
+            'initialAuditorGroups',
+            'initialAuditorMode',
+            'auditorGroups',
         ],
         'fields' => [
             'entityName' => [
-                'label' => &$GLOBALS['TL_LANG']['tl_page']['entityApprovement'],
+                'label' => &$GLOBALS['TL_LANG']['tl_page']['entityApprovement']['entityName'],
                 'inputType' => 'select',
                 'options' => [],
                 'reference' => &$GLOBALS['TL_LANG']['tl_page']['reference'],
@@ -43,35 +43,36 @@ $fields = [
                     'includeBlankOption' => true,
                 ],
             ],
-            'initial_auditor_groups' => [
-                'label' => &$GLOBALS['TL_LANG']['tl_page']['entityApprovement']['inialAuditorGroups'],
+            'initialAuditorGroups' => [
+                'label' => &$GLOBALS['TL_LANG']['tl_page']['entityApprovement']['initialAuditorGroups'],
                 'inputType' => 'checkbox',
-                'options_callback' => [PageContainer::class, 'getInitialAuditorGroups'],
+                'options_callback' => [PageContainer::class, 'getAuditorGroups'],
                 'eval' => [
                     'tl_class' => 'w50',
                     'includeBlankOption' => true,
                     'multiple' => true,
                 ],
             ],
-            'initial_auditor_mode' => [
+            'initialAuditorMode' => [
+                'label' => &$GLOBALS['TL_LANG']['tl_page']['entityApprovement']['initialAuditorMode'],
                 'inputType' => 'select',
                 'options' => [],
-                'reference' => &$GLOBALS['TL_LANG']['tl_']['reference'],
+                'reference' => &$GLOBALS['TL_LANG']['tl_page']['reference'],
                 'options_callback' => [PageContainer::class, 'getInitialAuditorModes'],
                 'eval' => [
                     'tl_class' => 'w50',
                     'includeBlankOption' => true,
                 ],
             ],
-            'auditor_groups' => [
-                'label' => &$GLOBALS['TL_LANG']['tl_page']['entityApprovement']['auditor'],
-                'inputType' => 'select',
+            'auditorGroups' => [
+                'label' => &$GLOBALS['TL_LANG']['tl_page']['entityApprovement']['auditorGroups'],
+                'inputType' => 'checkbox',
                 'options' => [],
-                'reference' => &$GLOBALS['TL_LANG']['tl_page']['reference'],
                 'options_callback' => [PageContainer::class, 'getAuditorGroups'],
                 'eval' => [
                     'tl_class' => 'w50',
                     'includeBlankOption' => true,
+                    'multiple' => true,
                 ],
             ],
         ],
