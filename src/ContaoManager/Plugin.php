@@ -13,6 +13,7 @@ use Contao\ManagerPlugin\Bundle\Config\BundleConfig;
 use Contao\ManagerPlugin\Bundle\Parser\ParserInterface;
 use Contao\ManagerPlugin\Config\ConfigPluginInterface;
 use HeimrichHannot\EntityApprovementBundle\HeimrichHannotEntityApprovementBundle;
+use Mvo\ContaoGroupWidget\MvoContaoGroupWidgetBundle;
 use Symfony\Component\Config\Loader\LoaderInterface;
 
 /**
@@ -29,6 +30,7 @@ class Plugin implements BundlePluginInterface, ConfigPluginInterface
             BundleConfig::create(HeimrichHannotEntityApprovementBundle::class)->setLoadAfter([
                     'submissions',
                     ContaoCoreBundle::class,
+                    MvoContaoGroupWidgetBundle::class,
             ]),
         ];
     }

@@ -22,9 +22,9 @@ class EntityApprovementConfigElement extends AbstractGroupElementEntity
     protected $parent;
 
     /**
-     * @ORM\Column(name="entity", type="string", length=64, options={"default": ""})
+     * @ORM\Column(name="entity_name", type="string", length=64, options={"default": ""})
      */
-    protected string $entity = '';
+    protected string $entityName = '';
 
     /**
      * @ORM\Column(name="initial_auditor_groups", type="string", length=32, options={"default": ""})
@@ -43,12 +43,12 @@ class EntityApprovementConfigElement extends AbstractGroupElementEntity
 
     public function getEntity(): string
     {
-        return $this->entity;
+        return $this->entityName;
     }
 
-    public function setEntity(string $entity): void
+    public function setEntity(string $entityName): void
     {
-        $this->entity = $entity;
+        $this->entityName = $entityName;
     }
 
     public function getInitialAuditorGroups(): string

@@ -8,6 +8,7 @@
 namespace HeimrichHannot\EntityApprovementBundle\DataContainer;
 
 use Contao\DataContainer;
+use HeimrichHannot\EntityApprovementBundle\DependencyInjection\Configuration;
 use HeimrichHannot\UtilsBundle\Choice\DataContainerChoice;
 use HeimrichHannot\UtilsBundle\Choice\FieldChoice;
 use HeimrichHannot\UtilsBundle\Dca\DcaUtil;
@@ -45,7 +46,10 @@ class PageContainer
 
     public function getAllEntities(DataContainer $dc): array
     {
-        return $this->dcChoice->getChoices();
+        $tables = $this->dcChoice->getChoices();
+        $configured = array_keys($this->bundleConfig);
+
+        return array_intersect($tables, $configured);
     }
 
     public function getAllFields(DataContainer $dc): array
@@ -71,8 +75,6 @@ class PageContainer
 
     public function getInitialAuditorModes(DataContainer $dc): array
     {
-        $options = [];
-
-        return $options;
+        return \is_array(Configuration::AUDITOR_MODES) ? Configuration::AUDITOR_MODES : [];
     }
 }
