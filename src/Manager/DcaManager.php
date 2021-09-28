@@ -75,11 +75,11 @@ class DcaManager
                     break;
 
                 case 'regular':
-                    $this->dcaUtil->addOverridableFields(['overrideActivateEntityApprovement', 'overrideEntityApprovement'], 'tl_page', 'tl_page');
+                    $this->dcaUtil->addOverridableFields(['activateEntityApprovement'], 'tl_page', 'tl_page');
 
                     PaletteManipulator::create()
                         ->addLegend('entity_approvement_legend', 'publish_legend', PaletteManipulator::POSITION_BEFORE)
-                        ->addField(['overrideActivateEntityApprovement', 'overrideEntityApprovement'], 'entity_approvment_legend', PaletteManipulator::POSITION_APPEND)
+                        ->addField(['overrideActivateEntityApprovement'], 'entity_approvement_legend', PaletteManipulator::POSITION_APPEND)
                         ->applyToPalette($paletteName, 'tl_page');
 
                     break;

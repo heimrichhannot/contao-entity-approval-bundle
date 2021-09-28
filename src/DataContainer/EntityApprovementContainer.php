@@ -11,6 +11,7 @@ use Contao\DataContainer;
 use Contao\StringUtil;
 use HeimrichHannot\EntityApprovementBundle\Dto\NotificationCenterOptionsDto;
 use HeimrichHannot\EntityApprovementBundle\Manager\EntityApprovementWorkflowManager;
+use HeimrichHannot\EntityApprovementBundle\Manager\NotificationManager;
 use HeimrichHannot\UtilsBundle\Database\DatabaseUtil;
 use HeimrichHannot\UtilsBundle\Model\ModelUtil;
 use HeimrichHannot\UtilsBundle\User\UserUtil;
@@ -57,35 +58,39 @@ class EntityApprovementContainer
         self::APPROVEMENT_TRANSITION_APPLY_CHANGE,
     ];
 
-    protected array                            $bundleConfig;
     protected DatabaseUtil                     $databaseUtil;
     protected EntityApprovementWorkflowManager $workflowManager;
     protected ModelUtil                        $modelUtil;
-    protected WorkflowInterface                $entityApprovementStateMachine;
+    protected NotificationManager              $notificationManager;
     protected TranslatorInterface              $translator;
     protected UserUtil                         $userUtil;
+    protected WorkflowInterface                $entityApprovementStateMachine;
+    protected array                            $bundleConfig;
 
     public function __construct(
         DatabaseUtil $databaseUtil,
-        ModelUtil $modelUtil,
-        UserUtil $userUtil,
         EntityApprovementWorkflowManager $workflowManager,
-        array $bundleConfig,
+        ModelUtil $modelUtil,
+        NotificationManager $notificationManager,
+        TranslatorInterface $translator,
+        UserUtil $userUtil,
         WorkflowInterface $entityApprovementStateMachine,
-        TranslatorInterface $translator
+        array $bundleConfig
     ) {
-        $this->bundleConfig = $bundleConfig;
         $this->databaseUtil = $databaseUtil;
         $this->workflowManager = $workflowManager;
         $this->modelUtil = $modelUtil;
-        $this->entityApprovementStateMachine = $entityApprovementStateMachine;
+        $this->notificationManager = $notificationManager;
         $this->translator = $translator;
         $this->userUtil = $userUtil;
+        $this->entityApprovementStateMachine = $entityApprovementStateMachine;
+        $this->bundleConfig = $bundleConfig;
     }
 
     public function getAuditors(?DataContainer $dc): array
     {
         $options = [];
+        $entityConfig = $this->getEntityConfig($dc);
 
         $groups = explode(',', $this->bundleConfig[$dc->table]['auditor_groups']);
 
@@ -122,7 +127,7 @@ class EntityApprovementContainer
         $options->type = EntityApprovementWorkflowManager::NOTIFICATION_TYPE_STATE_CHANGED;
 
         if ($value === $activeRecord['huhApprovement_state'] || $this->userUtil->isAdmin()) {
-            $this->workflowManager->sendMails($options);
+            $this->notificationManager->sendNotifications($options);
 
             return $value;
         }
@@ -148,7 +153,7 @@ class EntityApprovementContainer
                 $dc->table.'.id='.$activeRecord['id']);
         }
 
-        $this->workflowManager->sendMails($options);
+        $this->notificationManager->sendNotifications($options);
 
         return $value;
     }
@@ -183,5 +188,21 @@ class EntityApprovementContainer
         }
 
         return $value;
+    }
+
+    //get auditorGroups from tl_page configuration
+    //if not configured -> parent page -> till root page reached
+    //still not configured get it from yaml config
+    // TODO: can this be generalized on page level?
+    private function getEntityConfig(DataContainer $dc): array
+    {
+        $config = [];
+
+        $id = $dc->id;
+        $table = $dc->table;
+
+        $entity = $this->databaseUtil->findResultByPk($table, $id)->fetchAssoc();
+
+        return $config;
     }
 }

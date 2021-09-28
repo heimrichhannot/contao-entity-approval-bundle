@@ -9,6 +9,14 @@ use HeimrichHannot\EntityApprovementBundle\DependencyInjection\Configuration;
 
 $lang = &$GLOBALS['TL_LANG']['tl_page'];
 
+/*
+ * Legends
+ */
+$lang['entity_approvement_legend'] = 'Freigabe von Entitäten';
+
+$lang['activateEntityApprovement'][0] = 'Freigabe von Entitäten ändern';
+$lang['activateEntityApprovement'][1] = 'Wählen sie diese Option, wenn Sie die definierten Freigabeworkflows speziell für diese Seite anpassen möchten.';
+
 $lang['entityApprovement']['entityName'][0] = 'Entität';
 $lang['entityApprovement']['entityName'][1] = 'Wählen Sie hier die Entität aus, für die der Freigabeworkflow angepasst werden soll.';
 $lang['entityApprovement']['auditorGroups'][0] = 'Prüfer';
