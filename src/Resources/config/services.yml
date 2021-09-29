@@ -6,5 +6,5 @@ services:
     bind:
       $bundleConfig: '%huh_entity_approvement%'
 
-  HeimrichHannot\EntityApprovementBundle\:
+  HeimrichHannot\EntityApprovalBundle\:
     resource: "../../{DataContainer,EventListener,EventSubscriber,Manager}/*"
