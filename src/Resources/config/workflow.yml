@@ -1,13 +1,13 @@
 framework:
   workflows:
-    entity_approvement:
+    entity_approval:
       type: 'state_machine'
       audit_trail:
         enabled: true
       marking_store:
         type: 'single_state'
         arguments:
-          - 'huhApprovement_state'
+          - 'huhApproval_state'
       supports:
         - Contao\Model
       initial_marking: wait_for_initial_auditor

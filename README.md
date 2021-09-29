@@ -1,13 +1,13 @@
-# contao-entity-approvement-bundle
+# contao-entity-approval-bundle
 
 ## Workflow
 
-![workflow](docs/img/approvement-process.jpg)
+![workflow](docs/img/approval-process.jpg)
 
 ### config.yml
 
 ```yaml
-huh_entity_approvement:
+huh_entity_approval:
   tl_submission:
     initial_auditor_groups: '1'
     auditor_groups: '1,2,6'
@@ -20,4 +20,4 @@ huh_entity_approvement:
       state_changed_author: true
 ```
 
-`vendor/bin/contao-console workflow:dump entity_approvement | dot -Tpng -o vendor/heimrichhannot/contao-entity-approvement-bundle/docs/img/approvement-process.jpg`
+`vendor/bin/contao-console workflow:dump entity_approval | dot -Tpng -o vendor/heimrichhannot/contao-entity-approval-bundle/docs/img/approval-process.jpg`
