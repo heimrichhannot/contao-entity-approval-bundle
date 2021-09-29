@@ -5,10 +5,10 @@
  * @license LGPL-3.0-or-later
  */
 
-namespace HeimrichHannot\EntityApprovementBundle\EventListener\Contao;
+namespace HeimrichHannot\EntityApprovalBundle\EventListener\Contao;
 
 use Contao\CoreBundle\ServiceAnnotation\Hook;
-use HeimrichHannot\EntityApprovementBundle\Manager\DcaManager;
+use HeimrichHannot\EntityApprovalBundle\Manager\DcaManager;
 
 /**
  * @Hook("loadDataContainer")
@@ -33,11 +33,11 @@ class LoadDataContainerListener
     public function __invoke(string $table): void
     {
         if ('tl_page' === $table) {
-            $this->manager->addApprovementConfigToPage();
+            $this->manager->addApprovalConfigToPage();
         }
 
         if (\in_array($table, array_keys($this->config))) {
-            $this->manager->addApprovementToDca($table);
+            $this->manager->addApprovalToDca($table);
         }
     }
 }

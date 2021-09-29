@@ -5,13 +5,13 @@
  * @license LGPL-3.0-or-later
  */
 
-namespace HeimrichHannot\EntityApprovementBundle\DataContainer;
+namespace HeimrichHannot\EntityApprovalBundle\DataContainer;
 
 use Contao\DataContainer;
 use Contao\StringUtil;
-use HeimrichHannot\EntityApprovementBundle\Dto\NotificationCenterOptionsDto;
-use HeimrichHannot\EntityApprovementBundle\Manager\EntityApprovementWorkflowManager;
-use HeimrichHannot\EntityApprovementBundle\Manager\NotificationManager;
+use HeimrichHannot\EntityApprovalBundle\Dto\NotificationCenterOptionsDto;
+use HeimrichHannot\EntityApprovalBundle\Manager\EntityApprovalWorkflowManager;
+use HeimrichHannot\EntityApprovalBundle\Manager\NotificationManager;
 use HeimrichHannot\UtilsBundle\Database\DatabaseUtil;
 use HeimrichHannot\UtilsBundle\Model\ModelUtil;
 use HeimrichHannot\UtilsBundle\User\UserUtil;
@@ -19,62 +19,66 @@ use Symfony\Component\Translation\TranslatorInterface;
 use Symfony\Component\Workflow\Exception\TransitionException;
 use Symfony\Component\Workflow\WorkflowInterface;
 
-class EntityApprovementContainer
+class EntityApprovalContainer
 {
-    const APPROVEMENT_STATE_WAIT_FOR_INITIAL_AUDITOR = 'wait_for_initial_auditor';
-    const APPROVEMENT_STATE_IN_PROGRESS = 'in_progress';
-    const APPROVEMENT_STATE_CHANGES_REQUESTED = 'changes_requested';
-    const APPROVEMENT_STATE_APPROVED = 'approved';
-    const APPROVEMENT_STATE_REJECTED = 'rejected';
+    const APPROVAL_STATE_CREATED = 'created';
+    const APPROVAL_STATE_WAIT_FOR_INITIAL_AUDITOR = 'wait_for_initial_auditor';
+    const APPROVAL_STATE_IN_PROGRESS = 'in_progress';
+    const APPROVAL_STATE_CHANGES_REQUESTED = 'changes_requested';
+    const APPROVAL_STATE_APPROVED = 'approved';
+    const APPROVAL_STATE_REJECTED = 'rejected';
 
-    const APPROVEMENT_STATES = [
-        self::APPROVEMENT_STATE_WAIT_FOR_INITIAL_AUDITOR,
-        self::APPROVEMENT_STATE_IN_PROGRESS,
-        self::APPROVEMENT_STATE_CHANGES_REQUESTED,
-        self::APPROVEMENT_STATE_APPROVED,
-        self::APPROVEMENT_STATE_REJECTED,
+    const APPROVAL_STATES = [
+        self::APPROVAL_STATE_CREATED,
+        self::APPROVAL_STATE_WAIT_FOR_INITIAL_AUDITOR,
+        self::APPROVAL_STATE_IN_PROGRESS,
+        self::APPROVAL_STATE_CHANGES_REQUESTED,
+        self::APPROVAL_STATE_APPROVED,
+        self::APPROVAL_STATE_REJECTED,
     ];
 
-    const APPROVEMENT_ENTITY_STATES = [
-        self::APPROVEMENT_STATE_IN_PROGRESS,
-        self::APPROVEMENT_STATE_CHANGES_REQUESTED,
-        self::APPROVEMENT_STATE_APPROVED,
-        self::APPROVEMENT_STATE_REJECTED,
+    const APPROVAL_ENTITY_STATES = [
+        self::APPROVAL_STATE_IN_PROGRESS,
+        self::APPROVAL_STATE_CHANGES_REQUESTED,
+        self::APPROVAL_STATE_APPROVED,
+        self::APPROVAL_STATE_REJECTED,
     ];
 
-    const APPROVEMENT_TRANSITION_ASSIGN_AUDITOR = 'assign_auditor';
-    const APPROVEMENT_TRANSITION_REMOVE_ALL_AUDITORS = 'remove_all_auditors';
-    const APPROVEMENT_TRANSITION_APPROVE = 'approve';
-    const APPROVEMENT_TRANSITION_REJECT = 'reject';
-    const APPROVEMENT_TRANSITION_REQUEST_CHANGE = 'request_change';
-    const APPROVEMENT_TRANSITION_APPLY_CHANGE = 'apply_change';
+    const APPROVAL_TRANSITION_ASSIGN_INITIAL_AUDITOR = 'assign_initial_auditor';
+    const APPROVAL_TRANSITION_ASSIGN_AUDITOR = 'assign_auditor';
+    const APPROVAL_TRANSITION_REMOVE_ALL_AUDITORS = 'remove_all_auditors';
+    const APPROVAL_TRANSITION_APPROVE = 'approve';
+    const APPROVAL_TRANSITION_REJECT = 'reject';
+    const APPROVAL_TRANSITION_REQUEST_CHANGE = 'request_change';
+    const APPROVAL_TRANSITION_APPLY_CHANGE = 'apply_change';
 
-    const APPROVEMENT_TRANSITIONS = [
-        self::APPROVEMENT_TRANSITION_ASSIGN_AUDITOR,
-        self::APPROVEMENT_TRANSITION_REMOVE_ALL_AUDITORS,
-        self::APPROVEMENT_TRANSITION_APPROVE,
-        self::APPROVEMENT_TRANSITION_REJECT,
-        self::APPROVEMENT_TRANSITION_REQUEST_CHANGE,
-        self::APPROVEMENT_TRANSITION_APPLY_CHANGE,
+    const APPROVAL_TRANSITIONS = [
+        self::APPROVAL_TRANSITION_ASSIGN_INITIAL_AUDITOR,
+        self::APPROVAL_TRANSITION_ASSIGN_AUDITOR,
+        self::APPROVAL_TRANSITION_REMOVE_ALL_AUDITORS,
+        self::APPROVAL_TRANSITION_APPROVE,
+        self::APPROVAL_TRANSITION_REJECT,
+        self::APPROVAL_TRANSITION_REQUEST_CHANGE,
+        self::APPROVAL_TRANSITION_APPLY_CHANGE,
     ];
 
     protected DatabaseUtil                     $databaseUtil;
-    protected EntityApprovementWorkflowManager $workflowManager;
+    protected EntityApprovalWorkflowManager $workflowManager;
     protected ModelUtil                        $modelUtil;
     protected NotificationManager              $notificationManager;
     protected TranslatorInterface              $translator;
     protected UserUtil                         $userUtil;
-    protected WorkflowInterface                $entityApprovementStateMachine;
+    protected WorkflowInterface                $entityApprovalStateMachine;
     protected array                            $bundleConfig;
 
     public function __construct(
         DatabaseUtil $databaseUtil,
-        EntityApprovementWorkflowManager $workflowManager,
+        EntityApprovalWorkflowManager $workflowManager,
         ModelUtil $modelUtil,
         NotificationManager $notificationManager,
         TranslatorInterface $translator,
         UserUtil $userUtil,
-        WorkflowInterface $entityApprovementStateMachine,
+        WorkflowInterface $entityApprovalStateMachine,
         array $bundleConfig
     ) {
         $this->databaseUtil = $databaseUtil;
@@ -83,8 +87,23 @@ class EntityApprovementContainer
         $this->notificationManager = $notificationManager;
         $this->translator = $translator;
         $this->userUtil = $userUtil;
-        $this->entityApprovementStateMachine = $entityApprovementStateMachine;
+        $this->entityApprovalStateMachine = $entityApprovalStateMachine;
         $this->bundleConfig = $bundleConfig;
+    }
+
+    public function onSubmit(DataContainer $dc): void
+    {
+
+        $model = $this->modelUtil->findModelInstanceByPk($dc->table, $dc->id);
+
+        $marking = $this->entityApprovalStateMachine->getMarking($model);
+        $test = '';
+    }
+
+    public function onCreate(string $table, int $id, array $fields, DataContainer $dc): void
+    {
+        $model = $this->modelUtil->findModelInstanceByPk($table, $id);
+        $this->entityApprovalStateMachine->apply($model, static::APPROVAL_TRANSITION_ASSIGN_INITIAL_AUDITOR);
     }
 
     public function getAuditors(?DataContainer $dc): array
@@ -122,30 +141,30 @@ class EntityApprovementContainer
         $options->table = $dc->table;
         $options->entityId = $dc->id;
         $options->author = $model->__get($this->bundleConfig[$model::getTable()]['author_field']);
-        $options->recipients = StringUtil::deserialize($activeRecord['huhApprovement_auditor'], true);
+        $options->recipients = StringUtil::deserialize($activeRecord['huhApproval_auditor'], true);
         $options->state = $value;
-        $options->type = EntityApprovementWorkflowManager::NOTIFICATION_TYPE_STATE_CHANGED;
+        $options->type = EntityApprovalWorkflowManager::NOTIFICATION_TYPE_STATE_CHANGED;
 
-        if ($value === $activeRecord['huhApprovement_state'] || $this->userUtil->isAdmin()) {
+        if ($value === $activeRecord['huhApproval_state'] || $this->userUtil->isAdmin()) {
             $this->notificationManager->sendNotifications($options);
 
             return $value;
         }
 
-        $currentState = $activeRecord['huhApprovement_state'];
+        $currentState = $activeRecord['huhApproval_state'];
         $transitionName = $this->workflowManager->getTransitionName($currentState, $value);
 
         if (empty($transitionName)) {
             $message = sprintf(
-                $this->translator->trans('huh.entity_approvement.bocking.transition_not_allowed'),
-                $GLOBALS['TL_LANG']['MSC']['approvement_state'][$currentState],
-                $GLOBALS['TL_LANG']['MSC']['approvement_state'][$value]
+                $this->translator->trans('huh.entity_approval.bocking.transition_not_allowed'),
+                $GLOBALS['TL_LANG']['MSC']['approval_state'][$currentState],
+                $GLOBALS['TL_LANG']['MSC']['approval_state'][$value]
             );
 
-            throw new TransitionException($model, $transitionName, $this->entityApprovementStateMachine, $message);
+            throw new TransitionException($model, $transitionName, $this->entityApprovalStateMachine, $message);
         }
 
-        if ($currentState !== static::APPROVEMENT_STATE_APPROVED && $activeRecord[$this->bundleConfig[$dc->table]['publish_field']] === ($this->bundleConfig[$dc->table]['invert_publish_field'] ? '0' : '1')) {
+        if ($currentState !== static::APPROVAL_STATE_APPROVED && $activeRecord[$this->bundleConfig[$dc->table]['publish_field']] === ($this->bundleConfig[$dc->table]['invert_publish_field'] ? '0' : '1')) {
             $value = $this->bundleConfig[$dc->table]['invert_publish_field'] ? '1' : '0';
             $this->databaseUtil->update(
                 $dc->table,
@@ -167,9 +186,9 @@ class EntityApprovementContainer
 
         $activeRecord = $dc->activeRecord->row();
 
-        $state = $activeRecord['huhApprovement_state'];
+        $state = $activeRecord['huhApproval_state'];
 
-        if ($value === ($this->bundleConfig[$dc->table]['invert_publish_field'] ? '0' : '1') && $state !== static::APPROVEMENT_STATE_APPROVED) {
+        if ($value === ($this->bundleConfig[$dc->table]['invert_publish_field'] ? '0' : '1') && $state !== static::APPROVAL_STATE_APPROVED) {
             $unpublishValue = $this->bundleConfig[$dc->table]['invert_publish_field'] ? '1' : '0';
 
             $this->databaseUtil->update(
@@ -179,9 +198,9 @@ class EntityApprovementContainer
                 [$dc->id]);
 
             $message = sprintf(
-                $this->translator->trans('huh.entity_approvement.bocking.publishing_blocked'),
-                $GLOBALS['TL_LANG']['MSC']['approvement_state'][static::APPROVEMENT_STATE_APPROVED],
-                $GLOBALS['TL_LANG']['MSC']['approvement_state'][$state]
+                $this->translator->trans('huh.entity_approval.bocking.publishing_blocked'),
+                $GLOBALS['TL_LANG']['MSC']['approval_state'][static::APPROVAL_STATE_APPROVED],
+                $GLOBALS['TL_LANG']['MSC']['approval_state'][$state]
             );
 
             throw new \Exception($message);

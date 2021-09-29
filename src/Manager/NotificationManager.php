@@ -5,16 +5,24 @@
  * @license LGPL-3.0-or-later
  */
 
-namespace HeimrichHannot\EntityApprovementBundle\Manager;
+namespace HeimrichHannot\EntityApprovalBundle\Manager;
 
 use Contao\Environment;
-use HeimrichHannot\EntityApprovementBundle\DataContainer\EntityApprovementContainer;
-use HeimrichHannot\EntityApprovementBundle\DependencyInjection\Configuration;
-use HeimrichHannot\EntityApprovementBundle\Dto\NotificationCenterOptionsDto;
+use HeimrichHannot\EntityApprovalBundle\DataContainer\EntityApprovalContainer;
+use HeimrichHannot\EntityApprovalBundle\DependencyInjection\Configuration;
+use HeimrichHannot\EntityApprovalBundle\Dto\NotificationCenterOptionsDto;
 use NotificationCenter\Model\Notification;
 
 class NotificationManager
 {
+    const NOTIFICATION_TYPE_AUDITOR_CHANGED = 'huh_entity_approval_auditor_changed';
+    const NOTIFICATION_TYPE_STATE_CHANGED = 'huh_entity_approval_state_changed';
+
+    const NOTIFICATION_TYPES = [
+        self::NOTIFICATION_TYPE_AUDITOR_CHANGED,
+        self::NOTIFICATION_TYPE_STATE_CHANGED,
+    ];
+
     protected array $bundleConfig;
 
     public function __construct(array $bundleConfig)
@@ -25,7 +33,7 @@ class NotificationManager
     public function sendNotifications(NotificationCenterOptionsDto $options): void
     {
         switch ($options->state) {
-            case EntityApprovementContainer::APPROVEMENT_STATE_WAIT_FOR_INITIAL_AUDITOR:
+            case EntityApprovalContainer::APPROVAL_STATE_WAIT_FOR_INITIAL_AUDITOR:
                 $initialAuditors = explode(',', $this->bundleConfig[$options->table]['initial_auditor_groups']);
 
                 if (empty($initialAuditors)) {
@@ -42,7 +50,7 @@ class NotificationManager
 
                 break;
 
-            case EntityApprovementContainer::APPROVEMENT_STATE_IN_PROGRESS:
+            case EntityApprovalContainer::APPROVAL_STATE_IN_PROGRESS:
                 $stayedAuditors = array_intersect($options->auditorFormer, $options->auditorNew);
 
                 if ($this->bundleConfig[$options->table]['emails']['auditor_changed_former'] && !empty($options->auditorFormer)) {
@@ -57,9 +65,9 @@ class NotificationManager
 
                 break;
 
-            case EntityApprovementContainer::APPROVEMENT_STATE_APPROVED:
-            case EntityApprovementContainer::APPROVEMENT_STATE_REJECTED:
-                // send mail to author on final result of the entity approvement
+            case EntityApprovalContainer::APPROVAL_STATE_APPROVED:
+            case EntityApprovalContainer::APPROVAL_STATE_REJECTED:
+                // send mail to author on final result of the entity approval
                 if ($this->bundleConfig[$options->table]['emails']['state_changed_author'] && !empty($options->author)) {
                     $options->recipients = array_merge($options->recipients, [$options->author]);
                 }
@@ -81,8 +89,8 @@ class NotificationManager
 
         if (null !== $notificationCollection) {
             $tokens = [];
-            $tokens['approvement_recipients'] = $options->recipients;
-            $tokens['approvement_entity_url'] = Environment::get('url').'contao?do=submission&table='.$options->table.'&id='.$options->entityId.'&act=edit';
+            $tokens['approval_recipients'] = $options->recipients;
+            $tokens['approval_entity_url'] = Environment::get('url').'contao?do=submission&table='.$options->table.'&id='.$options->entityId.'&act=edit';
 
             while ($notificationCollection->next()) {
                 $notification = $notificationCollection->current();

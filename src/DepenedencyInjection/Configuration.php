@@ -5,14 +5,14 @@
  * @license LGPL-3.0-or-later
  */
 
-namespace HeimrichHannot\EntityApprovementBundle\DependencyInjection;
+namespace HeimrichHannot\EntityApprovalBundle\DependencyInjection;
 
 use Symfony\Component\Config\Definition\Builder\TreeBuilder;
 use Symfony\Component\Config\Definition\ConfigurationInterface;
 
 class Configuration implements ConfigurationInterface
 {
-    const ROOT_ID = 'huh_entity_approvement';
+    const ROOT_ID = 'huh_entity_approval';
 
     const AUDITOR_MODE_ALL = 'all';
     const AUDITOR_MODE_RANDOM = 'random';

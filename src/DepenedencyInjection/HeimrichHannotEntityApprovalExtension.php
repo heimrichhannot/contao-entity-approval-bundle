@@ -5,12 +5,12 @@
  * @license LGPL-3.0-or-later
  */
 
-namespace HeimrichHannot\EntityApprovementBundle\DependencyInjection;
+namespace HeimrichHannot\EntityApprovalBundle\DependencyInjection;
 
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Extension\Extension;
 
-class HeimrichHannotEntityApprovementExtension extends Extension
+class HeimrichHannotEntityApprovalExtension extends Extension
 {
     /**
      * {@inheritdoc}

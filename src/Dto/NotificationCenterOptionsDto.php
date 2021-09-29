@@ -5,15 +5,16 @@
  * @license LGPL-3.0-or-later
  */
 
-namespace HeimrichHannot\EntityApprovementBundle\Dto;
+namespace HeimrichHannot\EntityApprovalBundle\Dto;
 
 class NotificationCenterOptionsDto
 {
-    public string $state;
-    public string $author;
-    public string $table;
-    public string $entityId;
-    public string $type;
+    public string $state = '';
+    public string $transition = '';
+    public string $author = '';
+    public string $table = '';
+    public string $entityId = '';
+    public string $type = '';
     public array $auditors = [];
     public array $auditorFormer = [];
     public array $auditorNew = [];

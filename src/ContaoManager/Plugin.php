@@ -5,15 +5,14 @@
  * @license LGPL-3.0-or-later
  */
 
-namespace HeimrichHannot\EntityApprovementBundle\ContaoManager;
+namespace HeimrichHannot\EntityApprovalBundle\ContaoManager;
 
 use Contao\CoreBundle\ContaoCoreBundle;
 use Contao\ManagerPlugin\Bundle\BundlePluginInterface;
 use Contao\ManagerPlugin\Bundle\Config\BundleConfig;
 use Contao\ManagerPlugin\Bundle\Parser\ParserInterface;
 use Contao\ManagerPlugin\Config\ConfigPluginInterface;
-use HeimrichHannot\EntityApprovementBundle\HeimrichHannotEntityApprovementBundle;
-use Mvo\ContaoGroupWidget\MvoContaoGroupWidgetBundle;
+use HeimrichHannot\EntityApprovalBundle\HeimrichHannotEntityApprovalBundle;
 use Symfony\Component\Config\Loader\LoaderInterface;
 
 /**
@@ -27,10 +26,9 @@ class Plugin implements BundlePluginInterface, ConfigPluginInterface
     public function getBundles(ParserInterface $parser)
     {
         return [
-            BundleConfig::create(HeimrichHannotEntityApprovementBundle::class)->setLoadAfter([
+            BundleConfig::create(HeimrichHannotEntityApprovalBundle::class)->setLoadAfter([
                     'submissions',
                     ContaoCoreBundle::class,
-                    MvoContaoGroupWidgetBundle::class,
             ]),
         ];
     }
@@ -40,7 +38,7 @@ class Plugin implements BundlePluginInterface, ConfigPluginInterface
      */
     public function registerContainerConfiguration(LoaderInterface $loader, array $managerConfig)
     {
-        $loader->load('@HeimrichHannotEntityApprovementBundle/Resources/config/services.yml');
-        $loader->load('@HeimrichHannotEntityApprovementBundle/Resources/config/workflow.yml');
+        $loader->load('@HeimrichHannotEntityApprovalBundle/Resources/config/services.yml');
+        $loader->load('@HeimrichHannotEntityApprovalBundle/Resources/config/workflow.yml');
     }
 }

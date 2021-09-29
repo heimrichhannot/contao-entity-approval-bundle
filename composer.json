@@ -1,13 +1,12 @@
 {
-  "name": "heimrichhannot/contao-entity-approvement-bundle",
+  "name": "heimrichhannot/contao-entity-approval-bundle",
   "type": "contao-bundle",
-  "description": "This bundle offers customizable approvement process for all entities for the Contao CMS.",
+  "description": "This bundle offers customizable approval process for all entities for the Contao CMS.",
   "license": "LGPL-3.0-or-later",
   "require": {
     "php": "^7.2||^8.0",
     "contao/core-bundle": "^4.9",
     "heimrichhannot/contao-utils-bundle": "^2.204",
-    "mvo/contao-group-widget": "^1.3",
     "symfony/config": "^4.4",
     "symfony/workflow": "^4.4",
     "terminal42/notification_center": "^1.3"
@@ -26,7 +25,7 @@
   },
   "autoload": {
     "psr-4": {
-      "HeimrichHannot\\EntityApprovementBundle\\": "src/"
+      "HeimrichHannot\\EntityApproval\\": "src/"
     },
     "classmap": [
       "src/"
@@ -42,7 +41,7 @@
     "preferred-install": "dist"
   },
   "extra": {
-    "contao-manager-plugin": "HeimrichHannot\\EntityApprovementBundle\\ContaoManager\\Plugin",
+    "contao-manager-plugin": "HeimrichHannot\\EntityApprovalBundle\\ContaoManager\\Plugin",
     "foxy": true
   }
 }

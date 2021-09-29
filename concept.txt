@@ -8,7 +8,7 @@
 - Häkchen "informAuthor" -> default aus
 - Anmerkungen an den Autor
 - workflow mit symfony/workflow -> orientieren an drafts-bundle -> zustände vereinfachen
-- neues Feld "Prüfer" (auditor) -> Benutzer (Backend) aus bestimmten Gruppen (mehrere)
+- neues Feld "Prüfer" (auditor) -> Benutzer (Backend) aus bestimmten Gruppen (mehrere gruppen)
 - E-Mails werden über Notification Center versandt und haben eigene Typen (huh_entity_approval_auditor_changed, huh_entity_approval_state_changed) -> siehe drafts bundle config.php
  
  
@@ -25,8 +25,8 @@ Konfiguration:
 huh_entity_approval:
   tl_submission:
     initial_auditor_groups: 1
-    auditor_groups: 1,2,6
     initial_auditor_mode: random, all
+    auditor_groups: 1,2,6
     publish_field: published (default)
     invert_publish_field: true (default: false) -> tl_member.disable
     emails:

@@ -5,10 +5,10 @@
  * @license LGPL-3.0-or-later
  */
 
-namespace HeimrichHannot\EntityApprovementBundle\Manager;
+namespace HeimrichHannot\EntityApprovalBundle\Manager;
 
 use Contao\CoreBundle\DataContainer\PaletteManipulator;
-use HeimrichHannot\EntityApprovementBundle\DataContainer\EntityApprovementContainer;
+use HeimrichHannot\EntityApprovalBundle\DataContainer\EntityApprovalContainer;
 use HeimrichHannot\UtilsBundle\Dca\DcaUtil;
 
 class DcaManager
@@ -22,19 +22,19 @@ class DcaManager
         $this->dcaUtil = $dcaUtil;
     }
 
-    public function addApprovementToDca(string $table): void
+    public function addApprovalToDca(string $table): void
     {
         $this->dcaUtil->loadDc($table);
 
-        $this->addApprovementFieldsToDca($table);
+        $this->addApprovalFieldsToDca($table);
 
         if (!$this->bundleConfig[$table]['exclude_from_palettes']) {
             $fieldManipulator = PaletteManipulator::create()
-                ->addField(['huhApprovement_auditor', 'huhApprovement_state', 'huhApprovement_notes', 'huhApprovement_informAuthor'], 'approvement_legend', PaletteManipulator::POSITION_APPEND);
+                ->addField(['huhApproval_auditor', 'huhApproval_state', 'huhApproval_notes', 'huhApproval_informAuthor'], 'approval_legend', PaletteManipulator::POSITION_APPEND);
         }
 
         $legendManipulator = PaletteManipulator::create()
-            ->addLegend('approvement_legend', 'publish_legend', PaletteManipulator::POSITION_PREPEND);
+            ->addLegend('approval_legend', 'publish_legend', PaletteManipulator::POSITION_PREPEND);
 
         foreach ($GLOBALS['TL_DCA'][$table]['palettes'] as $key => $palette) {
             if ('__selector__' === $key) {
@@ -49,15 +49,17 @@ class DcaManager
         }
 
         $dca = &$GLOBALS['TL_DCA'][$table];
-        $dca['fields'][$this->bundleConfig[$table]['publish_field']]['save_callback'] = [[EntityApprovementContainer::class, 'onPublish']];
+        $dca['config']['oncreate_callback'][] = [EntityApprovalContainer::class, 'onCreate'];
+//        $dca['config']['onsubmit_callback'][] = [EntityApprovalContainer::class, 'onSubmit'];
+        $dca['fields'][$this->bundleConfig[$table]['publish_field']]['save_callback'] = [[EntityApprovalContainer::class, 'onPublish']];
     }
 
-    public function addApprovementConfigToPage(): void
+    public function addApprovalConfigToPage(): void
     {
         $dca = &$GLOBALS['TL_DCA']['tl_page'];
 
-        $dca['subpalettes']['activateEntityApprovement'] = 'entityApprovementConfig';
-        $dca['palettes']['__selector__'][] = 'activateEntityApprovement';
+        $dca['subpalettes']['activateEntityApproval'] = 'entityApprovalConfig';
+        $dca['palettes']['__selector__'][] = 'activateEntityApproval';
 
         foreach ($dca['palettes'] as $paletteName => $palette) {
             if (!\is_string($palette)) {
@@ -68,18 +70,18 @@ class DcaManager
                 case 'root':
                 case 'rootfallback':
                     PaletteManipulator::create()
-                        ->addLegend('entity_approvement_legend', 'publish_legend', PaletteManipulator::POSITION_BEFORE)
-                        ->addField(['activateEntityApprovement'], 'entity_approvement_legend', PaletteManipulator::POSITION_APPEND)
+                        ->addLegend('entity_approval_legend', 'publish_legend', PaletteManipulator::POSITION_BEFORE)
+                        ->addField(['activateEntityApproval'], 'entity_approval_legend', PaletteManipulator::POSITION_APPEND)
                         ->applyToPalette($paletteName, 'tl_page');
 
                     break;
 
                 case 'regular':
-                    $this->dcaUtil->addOverridableFields(['activateEntityApprovement'], 'tl_page', 'tl_page');
+                    $this->dcaUtil->addOverridableFields(['activateEntityApproval'], 'tl_page', 'tl_page');
 
                     PaletteManipulator::create()
-                        ->addLegend('entity_approvement_legend', 'publish_legend', PaletteManipulator::POSITION_BEFORE)
-                        ->addField(['overrideActivateEntityApprovement'], 'entity_approvement_legend', PaletteManipulator::POSITION_APPEND)
+                        ->addLegend('entity_approval_legend', 'publish_legend', PaletteManipulator::POSITION_BEFORE)
+                        ->addField(['overrideActivateEntityApproval'], 'entity_approval_legend', PaletteManipulator::POSITION_APPEND)
                         ->applyToPalette($paletteName, 'tl_page');
 
                     break;
@@ -90,38 +92,40 @@ class DcaManager
         }
     }
 
-    private function addApprovementFieldsToDca(string $table): void
+    private function addApprovalFieldsToDca(string $table): void
     {
         $dca = &$GLOBALS['TL_DCA'][$table];
 
         $fields = [
-            'huhApprovement_auditor' => [
-                'label' => &$GLOBALS['TL_LANG']['MSC']['approvement_auditor'],
+            'huhApproval_auditor' => [
+                'label' => &$GLOBALS['TL_LANG']['MSC']['approval_auditor'],
                 'exclude' => true,
                 'search' => true,
                 'sorting' => true,
                 'inputType' => 'checkbox',
-                'options_callback' => [EntityApprovementContainer::class, 'getAuditors'],
+                'options_callback' => [EntityApprovalContainer::class, 'getAuditors'],
                 'eval' => ['multiple' => true, 'mandatory' => false, 'tl_class' => 'clr w50'],
-                'save_callback' => [[EntityApprovementContainer::class, 'onAuditorsSave']],
                 'attributes' => ['legend' => 'publish_legend', 'fe_sorting' => true, 'fe_search' => true],
                 'sql' => 'blob NULL',
             ],
-            'huhApprovement_state' => [
-                'label' => &$GLOBALS['TL_LANG']['MSC']['approvement_state'],
+            'huhApproval_state' => [
+                'label' => &$GLOBALS['TL_LANG']['MSC']['approval_state'],
                 'exclude' => true,
                 'search' => false,
                 'sorting' => false,
                 'inputType' => 'radio',
-                'options' => EntityApprovementContainer::APPROVEMENT_STATES,
-                'reference' => &$GLOBALS['TL_LANG']['MSC']['approvement_state'],
-                'eval' => ['mandatory' => false, 'tl_class' => 'w50'],
+                'options' => EntityApprovalContainer::APPROVAL_STATES,
+                'reference' => &$GLOBALS['TL_LANG']['MSC']['approval_state'],
+                'eval' => [
+                    'mandatory' => false,
+                    'tl_class' => 'w50',
+                    'readonly' => true,
+                ],
                 'attributes' => ['legend' => 'publish_legend', 'fe_sorting' => true, 'fe_search' => true],
-                'save_callback' => [[EntityApprovementContainer::class, 'onStateSave']],
-                'sql' => "varchar(32) NOT NULL default '".EntityApprovementContainer::APPROVEMENT_STATE_WAIT_FOR_INITIAL_AUDITOR."'",
+                'sql' => "varchar(32) NOT NULL default '".EntityApprovalContainer::APPROVAL_STATE_CREATED."'",
             ],
-            'huhApprovement_notes' => [
-                'label' => &$GLOBALS['TL_LANG']['MSC']['approvement_notes'],
+            'huhApproval_notes' => [
+                'label' => &$GLOBALS['TL_LANG']['MSC']['approval_notes'],
                 'exclude' => true,
                 'inputType' => 'textarea',
                 'eval' => [
@@ -135,8 +139,8 @@ class DcaManager
                 'attributes' => ['legend' => 'publish_legend'],
                 'sql' => 'text NULL',
             ],
-            'huhApprovement_informAuthor' => [
-                'label' => &$GLOBALS['TL_LANG']['MSC']['approvement_informAuthor'],
+            'huhApproval_informAuthor' => [
+                'label' => &$GLOBALS['TL_LANG']['MSC']['approval_informAuthor'],
                 'exclude' => true,
                 'sorting' => true,
                 'inputType' => 'checkbox',
