@@ -15,8 +15,7 @@ class NotificationCenterOptionsDto
     public string $table = '';
     public string $entityId = '';
     public string $type = '';
-    public array $auditors = [];
-    public array $auditorFormer = [];
-    public array $auditorNew = [];
-    public array $recipients = [];
+    public string $auditor = '';
+    public string $auditorNew = '';
+    public string $recipients = '';
 }

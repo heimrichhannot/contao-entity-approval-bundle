@@ -8,14 +8,13 @@
 namespace HeimrichHannot\EntityApprovalBundle\DataContainer;
 
 use Contao\DataContainer;
-use Contao\StringUtil;
-use HeimrichHannot\EntityApprovalBundle\Dto\NotificationCenterOptionsDto;
-use HeimrichHannot\EntityApprovalBundle\Manager\EntityApprovalWorkflowManager;
 use HeimrichHannot\EntityApprovalBundle\Manager\NotificationManager;
 use HeimrichHannot\UtilsBundle\Database\DatabaseUtil;
+use HeimrichHannot\UtilsBundle\Dca\DcaUtil;
 use HeimrichHannot\UtilsBundle\Model\ModelUtil;
 use HeimrichHannot\UtilsBundle\User\UserUtil;
 use Symfony\Component\Translation\TranslatorInterface;
+use Symfony\Component\Workflow\Exception\LogicException;
 use Symfony\Component\Workflow\Exception\TransitionException;
 use Symfony\Component\Workflow\WorkflowInterface;
 
@@ -62,18 +61,18 @@ class EntityApprovalContainer
         self::APPROVAL_TRANSITION_APPLY_CHANGE,
     ];
 
-    protected DatabaseUtil                     $databaseUtil;
-    protected EntityApprovalWorkflowManager $workflowManager;
-    protected ModelUtil                        $modelUtil;
-    protected NotificationManager              $notificationManager;
-    protected TranslatorInterface              $translator;
-    protected UserUtil                         $userUtil;
-    protected WorkflowInterface                $entityApprovalStateMachine;
-    protected array                            $bundleConfig;
+    protected DatabaseUtil                  $databaseUtil;
+    protected ModelUtil                     $modelUtil;
+    protected NotificationManager           $notificationManager;
+    protected TranslatorInterface           $translator;
+    protected UserUtil                      $userUtil;
+    protected WorkflowInterface             $entityApprovalStateMachine;
+    protected array                         $bundleConfig;
+    protected DcaUtil                       $dcaUtil;
 
     public function __construct(
         DatabaseUtil $databaseUtil,
-        EntityApprovalWorkflowManager $workflowManager,
+        DcaUtil $dcaUtil,
         ModelUtil $modelUtil,
         NotificationManager $notificationManager,
         TranslatorInterface $translator,
@@ -82,37 +81,53 @@ class EntityApprovalContainer
         array $bundleConfig
     ) {
         $this->databaseUtil = $databaseUtil;
-        $this->workflowManager = $workflowManager;
         $this->modelUtil = $modelUtil;
         $this->notificationManager = $notificationManager;
         $this->translator = $translator;
         $this->userUtil = $userUtil;
         $this->entityApprovalStateMachine = $entityApprovalStateMachine;
         $this->bundleConfig = $bundleConfig;
-    }
-
-    public function onSubmit(DataContainer $dc): void
-    {
-
-        $model = $this->modelUtil->findModelInstanceByPk($dc->table, $dc->id);
-
-        $marking = $this->entityApprovalStateMachine->getMarking($model);
-        $test = '';
+        $this->dcaUtil = $dcaUtil;
     }
 
     public function onCreate(string $table, int $id, array $fields, DataContainer $dc): void
     {
         $model = $this->modelUtil->findModelInstanceByPk($table, $id);
-        $this->entityApprovalStateMachine->apply($model, static::APPROVAL_TRANSITION_ASSIGN_INITIAL_AUDITOR);
+
+        if ($this->entityApprovalStateMachine->can($model, static::APPROVAL_TRANSITION_ASSIGN_INITIAL_AUDITOR)) {
+            $this->entityApprovalStateMachine->apply($model, static::APPROVAL_TRANSITION_ASSIGN_INITIAL_AUDITOR);
+        }
+    }
+
+    public function onSaveAuditor($value, DataContainer $dc)
+    {
+        $model = $this->modelUtil->findModelInstanceByPk($dc->table, $dc->id);
+
+        if ($this->entityApprovalStateMachine->can($model, static::APPROVAL_TRANSITION_ASSIGN_AUDITOR)) {
+            $this->entityApprovalStateMachine->apply($model, static::APPROVAL_TRANSITION_ASSIGN_AUDITOR);
+        }
+
+        return $value;
+    }
+
+    public function getAvailableTransitions(?DataContainer $dc): array
+    {
+        $this->dcaUtil->loadLanguageFile('default');
+        $options = [];
+
+        $model = $this->modelUtil->findModelInstanceByPk($dc->table, $dc->id);
+
+        foreach ($this->entityApprovalStateMachine->getEnabledTransitions($model) as $transition) {
+            $options[$transition->getName()] = $GLOBALS['TL_LANG']['MSC']['reference'][$transition->getName()];
+        }
+
+        return $options;
     }
 
     public function getAuditors(?DataContainer $dc): array
     {
         $options = [];
-        $entityConfig = $this->getEntityConfig($dc);
-
         $groups = explode(',', $this->bundleConfig[$dc->table]['auditor_groups']);
-
         $activeGroups = $this->databaseUtil->findResultsBy('tl_user_group', ['tl_user_group.disable!=?'], ['1'])->fetchAllAssoc();
 
         foreach ($activeGroups as $group) {
@@ -124,62 +139,34 @@ class EntityApprovalContainer
         return $options;
     }
 
-    public function onAuditorsSave($value, DataContainer $dc)
+    public function onSaveTransition($value, ?DataContainer $dc)
     {
         $model = $this->modelUtil->findModelInstanceByPk($dc->table, $dc->id);
-        $this->workflowManager->workflowAuditorChange($value, $model);
+        $activeRecord = $dc->activeRecord;
 
-        return $value;
-    }
+        if (!(bool) $activeRecord->huhApproval_continue) {
+            $message = $this->translator->trans('huh.entity_approval.bocking.transition_not_accepted');
 
-    public function onStateSave($value, DataContainer $dc)
-    {
-        $model = $this->modelUtil->findModelInstanceByPk($dc->table, $dc->id);
-        $activeRecord = $dc->activeRecord->row();
-
-        $options = new NotificationCenterOptionsDto();
-        $options->table = $dc->table;
-        $options->entityId = $dc->id;
-        $options->author = $model->__get($this->bundleConfig[$model::getTable()]['author_field']);
-        $options->recipients = StringUtil::deserialize($activeRecord['huhApproval_auditor'], true);
-        $options->state = $value;
-        $options->type = EntityApprovalWorkflowManager::NOTIFICATION_TYPE_STATE_CHANGED;
-
-        if ($value === $activeRecord['huhApproval_state'] || $this->userUtil->isAdmin()) {
-            $this->notificationManager->sendNotifications($options);
-
-            return $value;
+            throw new LogicException($message, 0);
         }
 
-        $currentState = $activeRecord['huhApproval_state'];
-        $transitionName = $this->workflowManager->getTransitionName($currentState, $value);
-
-        if (empty($transitionName)) {
+        if ($this->entityApprovalStateMachine->can($model, $value)) {
+            $this->entityApprovalStateMachine->apply($model, $value);
+        } else {
             $message = sprintf(
-                $this->translator->trans('huh.entity_approval.bocking.transition_not_allowed'),
-                $GLOBALS['TL_LANG']['MSC']['approval_state'][$currentState],
-                $GLOBALS['TL_LANG']['MSC']['approval_state'][$value]
-            );
+                 $this->translator->trans('huh.entity_approval.bocking.transition_not_allowed'),
+                 $value,
+             );
 
-            throw new TransitionException($model, $transitionName, $this->entityApprovalStateMachine, $message);
+            throw new TransitionException($model, $value, $this->entityApprovalStateMachine, $message);
         }
-
-        if ($currentState !== static::APPROVAL_STATE_APPROVED && $activeRecord[$this->bundleConfig[$dc->table]['publish_field']] === ($this->bundleConfig[$dc->table]['invert_publish_field'] ? '0' : '1')) {
-            $value = $this->bundleConfig[$dc->table]['invert_publish_field'] ? '1' : '0';
-            $this->databaseUtil->update(
-                $dc->table,
-                [$dc->table.'.'.$this->bundleConfig[$dc->table]['publish_field'].'='.$value],
-                $dc->table.'.id='.$activeRecord['id']);
-        }
-
-        $this->notificationManager->sendNotifications($options);
 
         return $value;
     }
 
     public function onPublish($value, DataContainer $dc)
     {
-        //Admin still can publish event without workflow
+        //Admin still can publish even without workflow
         if ($this->userUtil->isAdmin() || ($this->bundleConfig[$dc->table]['invert_publish_field'] && '1' === $value) || (!$this->bundleConfig[$dc->table]['invert_publish_field'] && '0' === $value)) {
             return $value;
         }
@@ -207,21 +194,5 @@ class EntityApprovalContainer
         }
 
         return $value;
-    }
-
-    //get auditorGroups from tl_page configuration
-    //if not configured -> parent page -> till root page reached
-    //still not configured get it from yaml config
-    // TODO: can this be generalized on page level?
-    private function getEntityConfig(DataContainer $dc): array
-    {
-        $config = [];
-
-        $id = $dc->id;
-        $table = $dc->table;
-
-        $entity = $this->databaseUtil->findResultByPk($table, $id)->fetchAssoc();
-
-        return $config;
     }
 }

@@ -8,10 +8,11 @@
 namespace HeimrichHannot\EntityApprovalBundle\Manager;
 
 use Contao\Environment;
-use HeimrichHannot\EntityApprovalBundle\DataContainer\EntityApprovalContainer;
-use HeimrichHannot\EntityApprovalBundle\DependencyInjection\Configuration;
 use HeimrichHannot\EntityApprovalBundle\Dto\NotificationCenterOptionsDto;
-use NotificationCenter\Model\Notification;
+use HeimrichHannot\UtilsBundle\Driver\DC_Table_Utils;
+use HeimrichHannot\UtilsBundle\Form\FormUtil;
+use HeimrichHannot\UtilsBundle\Model\ModelUtil;
+use HeimrichHannot\UtilsBundle\Salutation\SalutationUtil;
 
 class NotificationManager
 {
@@ -23,80 +24,54 @@ class NotificationManager
         self::NOTIFICATION_TYPE_STATE_CHANGED,
     ];
 
-    protected array $bundleConfig;
+    protected array          $bundleConfig;
+    protected ModelUtil      $modelUtil;
+    protected FormUtil       $formUtil;
+    protected SalutationUtil $salutationUtil;
 
-    public function __construct(array $bundleConfig)
+    public function __construct(FormUtil $formUtil, ModelUtil $modelUtil, SalutationUtil $salutationUtil, array $bundleConfig)
     {
         $this->bundleConfig = $bundleConfig;
-    }
-
-    public function sendNotifications(NotificationCenterOptionsDto $options): void
-    {
-        switch ($options->state) {
-            case EntityApprovalContainer::APPROVAL_STATE_WAIT_FOR_INITIAL_AUDITOR:
-                $initialAuditors = explode(',', $this->bundleConfig[$options->table]['initial_auditor_groups']);
-
-                if (empty($initialAuditors)) {
-                    break;
-                }
-
-                if ($this->bundleConfig[$options->table]['initial_auditor_mode'][Configuration::AUDITOR_MODE_RANDOM]) {
-                    //send mails to all initial auditors
-                    $options->recipients = array_merge($options->recipients, $initialAuditors);
-                } elseif ($this->bundleConfig[$options->table]['initial_auditor_mode'][Configuration::AUDITOR_MODE_ALL]) {
-                    //send mails to a random initial auditor
-                    $options->recipients = array_merge($options->recipients, [$initialAuditors[array_rand($initialAuditors)]]);
-                }
-
-                break;
-
-            case EntityApprovalContainer::APPROVAL_STATE_IN_PROGRESS:
-                $stayedAuditors = array_intersect($options->auditorFormer, $options->auditorNew);
-
-                if ($this->bundleConfig[$options->table]['emails']['auditor_changed_former'] && !empty($options->auditorFormer)) {
-                    //send mails to former auditors he is not an auditor anymore
-                    $options->recipients = array_merge($options->recipients, array_diff($options->auditorFormer, $stayedAuditors));
-                }
-
-                if ($this->bundleConfig[$options->table]['emails']['auditor_changed_new'] && !empty($options->auditorNew)) {
-                    //send mails to new auditors who was not auditor before
-                    $options->recipients = array_merge($options->recipients, array_diff($options->auditorNew, $stayedAuditors));
-                }
-
-                break;
-
-            case EntityApprovalContainer::APPROVAL_STATE_APPROVED:
-            case EntityApprovalContainer::APPROVAL_STATE_REJECTED:
-                // send mail to author on final result of the entity approval
-                if ($this->bundleConfig[$options->table]['emails']['state_changed_author'] && !empty($options->author)) {
-                    $options->recipients = array_merge($options->recipients, [$options->author]);
-                }
-
-                break;
-
-            default:
-                break;
-        }
-
-        $options->recipients = array_unique($options->recipients);
-
-        $this->sendMail($options);
+        $this->modelUtil = $modelUtil;
+        $this->formUtil = $formUtil;
+        $this->salutationUtil = $salutationUtil;
     }
 
     public function sendMail(NotificationCenterOptionsDto $options): void
     {
-        $notificationCollection = Notification::findByType($options->type);
-
-        if (null !== $notificationCollection) {
-            $tokens = [];
-            $tokens['approval_recipients'] = $options->recipients;
-            $tokens['approval_entity_url'] = Environment::get('url').'contao?do=submission&table='.$options->table.'&id='.$options->entityId.'&act=edit';
-
+        if (null !== ($notificationCollection = $this->modelUtil->findModelInstancesBy('tl_nc_notification', ['tl_nc_notification.type=?'], [$options->type]))) {
             while ($notificationCollection->next()) {
                 $notification = $notificationCollection->current();
+                $tokens = $this->generateTokens($options);
+                $tokens['recipient_email'] = $options->recipients;
 
                 $notification->send($tokens);
             }
         }
+    }
+
+    private function generateTokens(NotificationCenterOptionsDto $options): array
+    {
+        $tokens = [];
+        $tokens['entity_url'] = Environment::get('url').'contao?do=submission&table='.$options->table.'&id='.$options->entityId.'&act=edit';
+
+        if (null !== ($entity = $this->modelUtil->findModelInstanceByPk($options->table, $options->entityId))) {
+            $dc = new DC_Table_Utils($options->table);
+            $dc->activeRecord = $entity;
+            $dc->id = $entity->id;
+
+            $tokens = array_merge($this->formUtil->getModelDataAsNotificationTokens($entity->row(), 'approval_entity_', $dc, []), $tokens);
+        }
+
+        if (null !== ($auditor = $this->modelUtil->findModelInstanceByPk('tl_user', $options->auditor))) {
+            $dc = new DC_Table_Utils('tl_user');
+            $dc->activeRecord = $auditor;
+            $dc->id = $auditor->id;
+
+            $tokens = array_merge($this->formUtil->getModelDataAsNotificationTokens($auditor->row(), 'approval_auditor_', $dc, []), $tokens);
+            $tokens['salutation_auditor'] = $this->salutationUtil->createSalutation($GLOBALS['TL_LANGUAGE'], $auditor->row());
+        }
+
+        return $tokens;
     }
 }

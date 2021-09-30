@@ -30,7 +30,7 @@ class DcaManager
 
         if (!$this->bundleConfig[$table]['exclude_from_palettes']) {
             $fieldManipulator = PaletteManipulator::create()
-                ->addField(['huhApproval_auditor', 'huhApproval_state', 'huhApproval_notes', 'huhApproval_informAuthor'], 'approval_legend', PaletteManipulator::POSITION_APPEND);
+                ->addField(['huhApproval_auditor', 'huhApproval_state', 'huhApproval_notes', 'huhApproval_informAuthor', 'huhApproval_continue'], 'approval_legend', PaletteManipulator::POSITION_APPEND);
         }
 
         $legendManipulator = PaletteManipulator::create()
@@ -50,7 +50,6 @@ class DcaManager
 
         $dca = &$GLOBALS['TL_DCA'][$table];
         $dca['config']['oncreate_callback'][] = [EntityApprovalContainer::class, 'onCreate'];
-//        $dca['config']['onsubmit_callback'][] = [EntityApprovalContainer::class, 'onSubmit'];
         $dca['fields'][$this->bundleConfig[$table]['publish_field']]['save_callback'] = [[EntityApprovalContainer::class, 'onPublish']];
     }
 
@@ -104,6 +103,7 @@ class DcaManager
                 'sorting' => true,
                 'inputType' => 'checkbox',
                 'options_callback' => [EntityApprovalContainer::class, 'getAuditors'],
+                'save_callback' => [[EntityApprovalContainer::class, 'onSaveAuditor']],
                 'eval' => ['multiple' => true, 'mandatory' => false, 'tl_class' => 'clr w50'],
                 'attributes' => ['legend' => 'publish_legend', 'fe_sorting' => true, 'fe_search' => true],
                 'sql' => 'blob NULL',
@@ -113,7 +113,7 @@ class DcaManager
                 'exclude' => true,
                 'search' => false,
                 'sorting' => false,
-                'inputType' => 'radio',
+                'inputType' => 'select',
                 'options' => EntityApprovalContainer::APPROVAL_STATES,
                 'reference' => &$GLOBALS['TL_LANG']['MSC']['approval_state'],
                 'eval' => [
@@ -148,7 +148,28 @@ class DcaManager
                     'mandatory' => false,
                     'tl_class' => 'clr w50',
                 ],
-                'attributes' => ['legend' => 'publish_legend', 'fe_sorting' => true],
+                'attributes' => ['legend' => 'publish_legend'],
+                'sql' => "char(1) NOT NULL default ''",
+            ],
+            'huhApproval_transition' => [
+                'label' => &$GLOBALS['TL_LANG']['MSC']['approval_transition'],
+                'filter' => true,
+                'inputType' => 'select',
+                'options_callback' => [EntityApprovalContainer::class, 'getAvailableTransitions'],
+                'save_callback' => [[EntityApprovalContainer::class, 'onSaveTransition']],
+                'eval' => ['tl_class' => 'w50', 'mandatory' => true, 'includeBlankOption' => true],
+                'sql' => "varchar(64) NOT NULL default ''",
+            ],
+            'huhApproval_continue' => [
+                'label' => &$GLOBALS['TL_LANG']['MSC']['approval_continue'],
+                'exclude' => true,
+                'sorting' => true,
+                'inputType' => 'checkbox',
+                'eval' => [
+                    'mandatory' => false,
+                    'tl_class' => 'clr w50',
+                ],
+                'attributes' => ['legend' => 'publish_legend'],
                 'sql' => "char(1) NOT NULL default ''",
             ],
         ];

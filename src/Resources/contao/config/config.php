@@ -13,18 +13,34 @@ $GLOBALS['NOTIFICATION_CENTER']['NOTIFICATION_TYPE'][Configuration::ROOT_ID] = [
         'recipients' => [
             'recipient_email',
         ],
-        'attachement_tokens' => [
-            'huhApproval_*',
-            'approval_entity',
+        'email_text' => [
+            'entity_url',
+            'salutation_auditor',
+            'approval_entity_*',
+            'approval_auditor_*',
+        ],
+        'email_html' => [
+            'entity_url',
+            'salutation_auditor',
+            'approval_entity_*',
+            'approval_auditor_*',
         ],
     ],
     NotificationManager::NOTIFICATION_TYPE_STATE_CHANGED => [
         'recipients' => [
             'recipient_email',
         ],
-        'attachement_tokens' => [
-            'huhApproval_*',
-            'approval_entity',
+        'email_text' => [
+            'entity_url',
+            'salutation_auditor',
+            'approval_entity_*',
+            'approval_auditor_*',
+        ],
+        'email_html' => [
+            'entity_url',
+            'salutation_auditor',
+            'approval_entity_*',
+            'approval_auditor_*',
         ],
     ],
 ];
