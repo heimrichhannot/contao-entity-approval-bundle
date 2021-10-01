@@ -53,11 +53,11 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
     {
         return [
             'workflow.entity_approval.entered.wait_for_initial_auditor' => ['onWorkflowEnteredInitialPlace'],
-            'workflow.entity_approval.transition.assign_auditor' => ['onWorkflowTransitionAssignAuditor'],
-            'workflow.entity_approval.transition.request_change' => ['onWorkflowTransitionRequestChange'],
-            'workflow.entity_approval.transition.apply_change' => ['onWorkflowTransitionApplyChange'],
-            'workflow.entity_approval.transition.approve' => ['onWorkflowTransitionApprove'],
-            'workflow.entity_approval.transition.reject' => ['onWorkflowTransitionReject'],
+//            'workflow.entity_approval.transition.assign_auditor' => ['onWorkflowTransitionAssignAuditor'],
+//            'workflow.entity_approval.transition.request_change' => ['onWorkflowTransitionRequestChange'],
+//            'workflow.entity_approval.transition.apply_change' => ['onWorkflowTransitionApplyChange'],
+//            'workflow.entity_approval.transition.approve' => ['onWorkflowTransitionApprove'],
+//            'workflow.entity_approval.transition.reject' => ['onWorkflowTransitionReject'],
         ];
     }
 
@@ -66,6 +66,7 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
         /** @var Model $model */
         $model = $event->getSubject();
         $table = $model->getTable();
+        $model->save();
 
         $groups = explode(',', $this->bundleConfig[$table]['initial_auditor_groups']);
 
@@ -91,117 +92,131 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
         $options->transition = $event->getTransition()->getName();
         $options->table = $table;
         $options->entityId = $model->id;
-        $options->author = $model->__get($this->bundleConfig[$table]['author_field']);
-
-        if (Configuration::AUDITOR_MODE_RANDOM === $mode) {
-            $options->recipients = $auditors[array_rand($auditors)];
-        } else {
-            $options->recipients = implode(',', $auditors);
-        }
+        $options->author = $model->{$this->bundleConfig[$table]['author_field']};
 
         $this->notificationManager->sendMail($options);
     }
 
-    public function onWorkflowTransitionAssignAuditor(TransitionEvent $event)
-    {
-        /** @var Model $model */
-        $model = $event->getSubject();
-        $table = $model->getTable();
-
-        $options = new NotificationCenterOptionsDto();
-        $options->table = $table;
-        $options->author = $model->__get($this->bundleConfig[$table]['author_field']);
-        $options->auditor = StringUtil::deserialize($model->huhApproval_auditor, true);
-        $options->state = EntityApprovalContainer::APPROVAL_STATE_WAIT_FOR_INITIAL_AUDITOR;
-        $options->type = NotificationManager::NOTIFICATION_TYPE_AUDITOR_CHANGED;
-
-        $recipients = $this->userUtil->findActiveByGroups(StringUtil::deserialize($model->huhApproval_auditor, true));
-        $options->recipients = implode(',', array_column($recipients, 'email'));
-
-        $this->notificationManager->sendMail($options);
-    }
-
-    public function onWorkflowTransitionRequestChange(TransitionEvent $event)
-    {
-        /** @var Model $model */
-        $model = $event->getSubject();
-        $table = $model->getTable();
-
-        $options = new NotificationCenterOptionsDto();
-        $options->table = $table;
-        $options->author = $model->__get($this->bundleConfig[$table]['author_field']);
-        $options->auditor = StringUtil::deserialize($model->huhApproval_auditor, true);
-        $options->state = EntityApprovalContainer::APPROVAL_STATE_CHANGES_REQUESTED;
-        $options->type = NotificationManager::NOTIFICATION_TYPE_STATE_CHANGED;
-        $options->entityId = $model->id;
-        $options->transition = EntityApprovalContainer::APPROVAL_TRANSITION_REQUEST_CHANGE;
-
-        if ((bool) $model->huhApproval_informAuthor) {
-            $options->recipients = $model->__get($this->bundleConfig[$table]['author_field']);
-            $this->notificationManager->sendMail($options);
-        }
-    }
-
-    public function onWorkflowTransitionApplyChange(TransitionEvent $event)
-    {
-        /** @var Model $model */
-        $model = $event->getSubject();
-        $table = $model->getTable();
-
-        $options = new NotificationCenterOptionsDto();
-        $options->table = $table;
-        $options->author = $model->__get($this->bundleConfig[$table]['author_field']);
-        $options->auditor = StringUtil::deserialize($model->huhApproval_auditor, true);
-        $options->state = EntityApprovalContainer::APPROVAL_STATE_IN_PROGRESS;
-        $options->type = NotificationManager::NOTIFICATION_TYPE_STATE_CHANGED;
-        $options->entityId = $model->id;
-        $options->transition = EntityApprovalContainer::APPROVAL_TRANSITION_APPLY_CHANGE;
-
-        if ((bool) $model->huhApproval_informAuthor) {
-            $options->recipients = $model->__get($this->bundleConfig[$table]['author_field']);
-            $this->notificationManager->sendMail($options);
-        }
-    }
-
-    public function onWorkflowTransitionApprove(TransitionEvent $event)
-    {
-        /** @var Model $model */
-        $model = $event->getSubject();
-        $table = $model->getTable();
-
-        $options = new NotificationCenterOptionsDto();
-        $options->table = $table;
-        $options->author = $model->__get($this->bundleConfig[$table]['author_field']);
-        $options->auditor = StringUtil::deserialize($model->huhApproval_auditor, true);
-        $options->state = EntityApprovalContainer::APPROVAL_STATE_APPROVED;
-        $options->type = NotificationManager::NOTIFICATION_TYPE_STATE_CHANGED;
-        $options->entityId = $model->id;
-        $options->transition = EntityApprovalContainer::APPROVAL_TRANSITION_APPROVE;
-
-        if ((bool) $model->huhApproval_informAuthor) {
-            $options->recipients = $model->__get($this->bundleConfig[$table]['author_field']);
-            $this->notificationManager->sendMail($options);
-        }
-    }
-
-    public function onWorkflowTransitionReject(TransitionEvent $event)
-    {
-        /** @var Model $model */
-        $model = $event->getSubject();
-        $table = $model->getTable();
-
-        $options = new NotificationCenterOptionsDto();
-        $options->table = $table;
-        $options->author = $model->__get($this->bundleConfig[$table]['author_field']);
-        $options->auditor = StringUtil::deserialize($model->huhApproval_auditor, true);
-        $options->state = EntityApprovalContainer::APPROVAL_STATE_REJECTED;
-        $options->type = NotificationManager::NOTIFICATION_TYPE_STATE_CHANGED;
-        $options->entityId = $model->id;
-        $options->transition = EntityApprovalContainer::APPROVAL_TRANSITION_REJECT;
-
-        if ((bool) $model->huhApproval_informAuthor) {
-            $options->recipients = $model->__get($this->bundleConfig[$table]['author_field']);
-            $this->notificationManager->sendMail($options);
-        }
-    }
+//    public function onWorkflowTransitionAssignAuditor(TransitionEvent $event)
+//    {
+//        /** @var Model $model */
+//        $model = $event->getSubject();
+//        $modelRow = $model->row();
+//        $modelRow['state'] = EntityApprovalContainer::APPROVAL_STATE_IN_PROGRESS;
+//        $model->setRow($modelRow);
+//        $model->save();
+//// TODO: einzelne personen als auditor ...
+//        if (!empty($model->huhApproval_auditor)) {
+//            $table = $model->getTable();
+//            $options = new NotificationCenterOptionsDto();
+//            $options->table = $table;
+//            $options->author = $model->{$this->bundleConfig[$table]['author_field']};
+//            $options->auditor = $model->huhApproval_auditor ?: '';
+//            $options->state = EntityApprovalContainer::APPROVAL_STATE_WAIT_FOR_INITIAL_AUDITOR;
+//            $options->type = NotificationManager::NOTIFICATION_TYPE_AUDITOR_CHANGED;
+//            $recipients = $this->userUtil->findActiveByGroups(StringUtil::deserialize($model->huhApproval_auditor, true))->fetchAll();
+//            $options->recipients = implode(',', array_column($recipients, 'email'));
+//            $this->notificationManager->sendMail($options);
+//        }
+//    }
+//
+//    public function onWorkflowTransitionRequestChange(TransitionEvent $event)
+//    {
+//        /** @var Model $model */
+//        $model = $event->getSubject();
+//        $modelRow = $model->row();
+//        $modelRow['state'] = EntityApprovalContainer::APPROVAL_STATE_CHANGES_REQUESTED;
+//        $model->setRow($modelRow);
+//        $model->save();
+//
+//        $table = $model->getTable();
+//        $options = new NotificationCenterOptionsDto();
+//        $options->table = $table;
+//        $options->author = $model->{$this->bundleConfig[$table]['author_field']};
+//        $options->auditor = $model->huhApproval_auditor ?: '';
+//        $options->state = EntityApprovalContainer::APPROVAL_STATE_CHANGES_REQUESTED;
+//        $options->type = NotificationManager::NOTIFICATION_TYPE_STATE_CHANGED;
+//        $options->entityId = $model->id;
+//        $options->transition = EntityApprovalContainer::APPROVAL_TRANSITION_REQUEST_CHANGE;
+//
+//        if ((bool) $model->huhApproval_informAuthor) {
+//            $options->recipients = $model->{$this->bundleConfig[$table]['author_field']};
+//            $this->notificationManager->sendMail($options);
+//        }
+//    }
+//
+//    public function onWorkflowTransitionApplyChange(TransitionEvent $event)
+//    {
+//        /** @var Model $model */
+//        $model = $event->getSubject();
+//        $modelRow = $model->row();
+//        $modelRow['state'] = EntityApprovalContainer::APPROVAL_STATE_IN_PROGRESS;
+//        $model->setRow($modelRow);
+//        $model->save();
+//
+//        $table = $model->getTable();
+//        $options = new NotificationCenterOptionsDto();
+//        $options->table = $table;
+//        $options->author = $model->{$this->bundleConfig[$table]['author_field']};
+//        $options->auditor = $model->huhApproval_auditor ?: '';
+//        $options->state = EntityApprovalContainer::APPROVAL_STATE_IN_PROGRESS;
+//        $options->type = NotificationManager::NOTIFICATION_TYPE_STATE_CHANGED;
+//        $options->entityId = $model->id;
+//        $options->transition = EntityApprovalContainer::APPROVAL_TRANSITION_APPLY_CHANGE;
+//
+//        if ((bool) $model->huhApproval_informAuthor) {
+//            $options->recipients = $model->{$this->bundleConfig[$table]['author_field']};
+//            $this->notificationManager->sendMail($options);
+//        }
+//    }
+//
+//    public function onWorkflowTransitionApprove(TransitionEvent $event)
+//    {
+//        /** @var Model $model */
+//        $model = $event->getSubject();
+//        $modelRow = $model->row();
+//        $modelRow['state'] = EntityApprovalContainer::APPROVAL_STATE_APPROVED;
+//        $model->setRow($modelRow);
+//        $model->save();
+//
+//        $table = $model->getTable();
+//        $options = new NotificationCenterOptionsDto();
+//        $options->table = $table;
+//        $options->author = $model->{$this->bundleConfig[$table]['author_field']};
+//        $options->auditor = $model->huhApproval_auditor ?: '';
+//        $options->state = EntityApprovalContainer::APPROVAL_STATE_APPROVED;
+//        $options->type = NotificationManager::NOTIFICATION_TYPE_STATE_CHANGED;
+//        $options->entityId = $model->id;
+//        $options->transition = EntityApprovalContainer::APPROVAL_TRANSITION_APPROVE;
+//
+//        if ((bool) $model->huhApproval_informAuthor) {
+//            $options->recipients = $model->{$this->bundleConfig[$table]['author_field']};
+//            $this->notificationManager->sendMail($options);
+//        }
+//    }
+//
+//    public function onWorkflowTransitionReject(TransitionEvent $event)
+//    {
+//        /** @var Model $model */
+//        $model = $event->getSubject();
+//        $modelRow = $model->row();
+//        $modelRow['state'] = EntityApprovalContainer::APPROVAL_STATE_REJECTED;
+//        $model->setRow($modelRow);
+//        $model->save();
+//
+//        $table = $model->getTable();
+//        $options = new NotificationCenterOptionsDto();
+//        $options->table = $table;
+//        $options->author = $model->{$this->bundleConfig[$table]['author_field']};
+//        $options->auditor = $model->huhApproval_auditor ?: '';
+//        $options->state = EntityApprovalContainer::APPROVAL_STATE_REJECTED;
+//        $options->type = NotificationManager::NOTIFICATION_TYPE_STATE_CHANGED;
+//        $options->entityId = $model->id;
+//        $options->transition = EntityApprovalContainer::APPROVAL_TRANSITION_REJECT;
+//
+//        if ((bool) $model->huhApproval_informAuthor) {
+//            $options->recipients = $model->{$this->bundleConfig[$table]['author_field']};
+//            $this->notificationManager->sendMail($options);
+//        }
+//    }
 }

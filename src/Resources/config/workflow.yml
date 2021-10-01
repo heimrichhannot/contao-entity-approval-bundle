@@ -10,35 +10,25 @@ framework:
           - 'huhApproval_state'
       supports:
         - Contao\Model
-      initial_marking: wait_for_initial_auditor
+      initial_marking: created
       places:
         - created
-        - wait_for_initial_auditor
-        - in_progress
-        - changes_requested
         - approved
         - rejected
+        - in_audit
       transitions:
-        assign_initial_auditor:
+        submit:
           from: created
-          to: wait_for_initial_auditor
-        assign_auditor:
-          from: wait_for_initial_auditor
-          to: in_progress
-        remove_all_auditors:
-          from: in_progress
-          to: wait_for_initial_auditor
+          to: in_audit
+        assign_new_auditor:
+          from: in_audit
+          to: in_audit
         approve:
-          from: in_progress
+          from: in_audit
           to: approved
         reject:
-          from: in_progress
+          from: in_audit
           to: rejected
         request_change:
-          from: [in_progress, rejected, approved]
-          to: changes_requested
-        apply_change:
-          from: changes_requested
-          to: in_progress
-
-
+          from: in_audit
+          to: created

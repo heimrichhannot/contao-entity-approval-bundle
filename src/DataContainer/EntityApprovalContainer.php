@@ -7,7 +7,9 @@
 
 namespace HeimrichHannot\EntityApprovalBundle\DataContainer;
 
+use Contao\BackendUser;
 use Contao\DataContainer;
+use Contao\Model;
 use HeimrichHannot\EntityApprovalBundle\Manager\NotificationManager;
 use HeimrichHannot\UtilsBundle\Database\DatabaseUtil;
 use HeimrichHannot\UtilsBundle\Dca\DcaUtil;
@@ -21,44 +23,35 @@ use Symfony\Component\Workflow\WorkflowInterface;
 class EntityApprovalContainer
 {
     const APPROVAL_STATE_CREATED = 'created';
-    const APPROVAL_STATE_WAIT_FOR_INITIAL_AUDITOR = 'wait_for_initial_auditor';
-    const APPROVAL_STATE_IN_PROGRESS = 'in_progress';
-    const APPROVAL_STATE_CHANGES_REQUESTED = 'changes_requested';
+    const APPROVAL_STATE_IN_AUDIT = 'in_audit';
     const APPROVAL_STATE_APPROVED = 'approved';
     const APPROVAL_STATE_REJECTED = 'rejected';
 
     const APPROVAL_STATES = [
         self::APPROVAL_STATE_CREATED,
-        self::APPROVAL_STATE_WAIT_FOR_INITIAL_AUDITOR,
-        self::APPROVAL_STATE_IN_PROGRESS,
-        self::APPROVAL_STATE_CHANGES_REQUESTED,
+        self::APPROVAL_STATE_IN_AUDIT,
         self::APPROVAL_STATE_APPROVED,
         self::APPROVAL_STATE_REJECTED,
     ];
 
     const APPROVAL_ENTITY_STATES = [
-        self::APPROVAL_STATE_IN_PROGRESS,
-        self::APPROVAL_STATE_CHANGES_REQUESTED,
+        self::APPROVAL_STATE_IN_AUDIT,
         self::APPROVAL_STATE_APPROVED,
         self::APPROVAL_STATE_REJECTED,
     ];
 
-    const APPROVAL_TRANSITION_ASSIGN_INITIAL_AUDITOR = 'assign_initial_auditor';
-    const APPROVAL_TRANSITION_ASSIGN_AUDITOR = 'assign_auditor';
-    const APPROVAL_TRANSITION_REMOVE_ALL_AUDITORS = 'remove_all_auditors';
+    const APPROVAL_TRANSITION_SUBMIT = 'submit';
     const APPROVAL_TRANSITION_APPROVE = 'approve';
     const APPROVAL_TRANSITION_REJECT = 'reject';
     const APPROVAL_TRANSITION_REQUEST_CHANGE = 'request_change';
-    const APPROVAL_TRANSITION_APPLY_CHANGE = 'apply_change';
+    const APPROVAL_TRANSITION_ASSIGN_NEW_AUDITOR = 'assign_new_auditor';
 
     const APPROVAL_TRANSITIONS = [
-        self::APPROVAL_TRANSITION_ASSIGN_INITIAL_AUDITOR,
-        self::APPROVAL_TRANSITION_ASSIGN_AUDITOR,
-        self::APPROVAL_TRANSITION_REMOVE_ALL_AUDITORS,
+        self::APPROVAL_TRANSITION_SUBMIT,
+        self::APPROVAL_TRANSITION_ASSIGN_NEW_AUDITOR,
         self::APPROVAL_TRANSITION_APPROVE,
         self::APPROVAL_TRANSITION_REJECT,
         self::APPROVAL_TRANSITION_REQUEST_CHANGE,
-        self::APPROVAL_TRANSITION_APPLY_CHANGE,
     ];
 
     protected DatabaseUtil                  $databaseUtil;
@@ -94,8 +87,43 @@ class EntityApprovalContainer
     {
         $model = $this->modelUtil->findModelInstanceByPk($table, $id);
 
-        if ($this->entityApprovalStateMachine->can($model, static::APPROVAL_TRANSITION_ASSIGN_INITIAL_AUDITOR)) {
-            $this->entityApprovalStateMachine->apply($model, static::APPROVAL_TRANSITION_ASSIGN_INITIAL_AUDITOR);
+        if ($this->entityApprovalStateMachine->can($model, static::APPROVAL_TRANSITION_SUBMIT)) {
+            $this->entityApprovalStateMachine->apply($model, static::APPROVAL_TRANSITION_SUBMIT);
+        }
+    }
+
+    // TODO: history und extra felder
+    public function onSubmit(?DataContainer $dc): void
+    {
+        /** @var Model $model */
+        $model = $this->modelUtil->findModelInstanceByPk($dc->table, $dc->id);
+        $activeRecord = $dc->activeRecord;
+
+        //transition auf null
+
+        $backendUser = BackendUser::getInstance();
+
+        if (
+            $model->huhApproval_state === static::APPROVAL_STATE_IN_AUDIT &&
+            (int) $backendUser->id !== (int) $model->{$this->bundleConfig[$dc->table]['author_field']} &&
+            (int) $backendUser->id === (int) $model->huhApproval_auditor
+        ) {
+            if (!(bool) $model->huhApproval_continue) {
+                $message = $this->translator->trans('huh.entity_approval.bocking.transition_not_accepted');
+
+                throw new LogicException($message, 0);
+            }
+
+            if ($this->entityApprovalStateMachine->can($model, $activeRecord->huhApproval_transition)) {
+                $this->entityApprovalStateMachine->apply($model, $activeRecord->huhApproval_transition);
+            } else {
+                $message = sprintf(
+                    $this->translator->trans('huh.entity_approval.bocking.transition_not_allowed'),
+                    $activeRecord->huhApproval_transition,
+                );
+
+                throw new TransitionException($model, $activeRecord->huhApproval_transition, $this->entityApprovalStateMachine, $message);
+            }
         }
     }
 
@@ -103,8 +131,8 @@ class EntityApprovalContainer
     {
         $model = $this->modelUtil->findModelInstanceByPk($dc->table, $dc->id);
 
-        if ($this->entityApprovalStateMachine->can($model, static::APPROVAL_TRANSITION_ASSIGN_AUDITOR)) {
-            $this->entityApprovalStateMachine->apply($model, static::APPROVAL_TRANSITION_ASSIGN_AUDITOR);
+        if ($this->entityApprovalStateMachine->can($model, static::APPROVAL_TRANSITION_ASSIGN_NEW_AUDITOR)) {
+            $this->entityApprovalStateMachine->apply($model, static::APPROVAL_TRANSITION_ASSIGN_NEW_AUDITOR);
         }
 
         return $value;
@@ -141,6 +169,7 @@ class EntityApprovalContainer
 
     public function onSaveTransition($value, ?DataContainer $dc)
     {
+        /** @var Model $model */
         $model = $this->modelUtil->findModelInstanceByPk($dc->table, $dc->id);
         $activeRecord = $dc->activeRecord;
 
