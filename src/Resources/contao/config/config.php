@@ -7,6 +7,7 @@
 
 use HeimrichHannot\EntityApprovalBundle\DependencyInjection\Configuration;
 use HeimrichHannot\EntityApprovalBundle\Manager\NotificationManager;
+use HeimrichHannot\EntityApprovalBundle\Model\EntityApprovalHistoryModel;
 
 $GLOBALS['NOTIFICATION_CENTER']['NOTIFICATION_TYPE'][Configuration::ROOT_ID] = [
     NotificationManager::NOTIFICATION_TYPE_AUDITOR_CHANGED => [
@@ -44,3 +45,12 @@ $GLOBALS['NOTIFICATION_CENTER']['NOTIFICATION_TYPE'][Configuration::ROOT_ID] = [
         ],
     ],
 ];
+
+$GLOBALS['BE_MOD']['content']['entityApproval'] = [
+    'tables' => [EntityApprovalHistoryModel::getTable()],
+];
+
+/*
+ * Models
+ */
+$GLOBALS['TL_MODELS'][EntityApprovalHistoryModel::getTable()] = EntityApprovalHistoryModel::class;

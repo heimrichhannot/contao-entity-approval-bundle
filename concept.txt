@@ -43,3 +43,27 @@ Custom:
  
 - Operation an tl_submission  convert submission -> tl_faq mit Kategorie übernehmen (association)
 - neues feld submissionAuthorMessage und Checkbox informSubmissionAuthor 
+
+
+partial_approve
+
+final approve (-> statusänderung zum "approved") & partial approve (-> leitet nur weiter zur nächsten Stufe, d.h. zum nächsten auditor)
+
+reject -> reject
+
+final approve oder partial approve
+
+-> history -> nein (flüchtig)
+-> entität -> status pro level
+submission.state
+submission.state_initial -> rejected, approved
+submission.state_hh ->
+submission.state_eezy ->
+
+-> partial_approve -> programmatisch final approve
+
+partial approve:
+
+if (all states aproved) {
+workflow->approve()
+}

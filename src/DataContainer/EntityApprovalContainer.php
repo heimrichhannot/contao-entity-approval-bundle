@@ -54,14 +54,14 @@ class EntityApprovalContainer
         self::APPROVAL_TRANSITION_REQUEST_CHANGE,
     ];
 
-    protected DatabaseUtil                  $databaseUtil;
-    protected ModelUtil                     $modelUtil;
-    protected NotificationManager           $notificationManager;
-    protected TranslatorInterface           $translator;
-    protected UserUtil                      $userUtil;
-    protected WorkflowInterface             $entityApprovalStateMachine;
-    protected array                         $bundleConfig;
-    protected DcaUtil                       $dcaUtil;
+    protected DatabaseUtil        $databaseUtil;
+    protected ModelUtil           $modelUtil;
+    protected NotificationManager $notificationManager;
+    protected TranslatorInterface $translator;
+    protected UserUtil            $userUtil;
+    protected WorkflowInterface   $entityApprovalStateMachine;
+    protected array               $bundleConfig;
+    protected DcaUtil             $dcaUtil;
 
     public function __construct(
         DatabaseUtil $databaseUtil,
@@ -92,50 +92,72 @@ class EntityApprovalContainer
         }
     }
 
-    // TODO: history und extra felder
     public function onSubmit(?DataContainer $dc): void
     {
         /** @var Model $model */
         $model = $this->modelUtil->findModelInstanceByPk($dc->table, $dc->id);
         $activeRecord = $dc->activeRecord;
 
-        //transition auf null
-
         $backendUser = BackendUser::getInstance();
 
-        if (
-            $model->huhApproval_state === static::APPROVAL_STATE_IN_AUDIT &&
-            (int) $backendUser->id !== (int) $model->{$this->bundleConfig[$dc->table]['author_field']} &&
-            (int) $backendUser->id === (int) $model->huhApproval_auditor
-        ) {
-            if (!(bool) $model->huhApproval_continue) {
-                $message = $this->translator->trans('huh.entity_approval.bocking.transition_not_accepted');
+        if (((int) $backendUser->id !== (int) $model->huh_approval_auditor || $model->huh_approval_state === static::APPROVAL_STATE_APPROVED) && !$backendUser->isAdmin) {
+            $message = $this->translator->trans('huh.entity_approval.blocking.modification_not_allowed');
 
-                throw new LogicException($message, 0);
+            throw new \Exception($message);
+        }
+
+        foreach ($this->bundleConfig[$model->getTable()]['auditor_levels'] as $level) {
+            if (null !== ($userGroups = $this->userUtil->getActiveGroups($backendUser->id))) {
+                $userGroups = array_map('strval', array_column($userGroups->fetchAll(), 'id'));
+                $levelGroups = array_map('strval', $level['groups']);
+                $intersectGroups = array_intersect($levelGroups, $userGroups);
             }
 
-            if ($this->entityApprovalStateMachine->can($model, $activeRecord->huhApproval_transition)) {
-                $this->entityApprovalStateMachine->apply($model, $activeRecord->huhApproval_transition);
-            } else {
-                $message = sprintf(
-                    $this->translator->trans('huh.entity_approval.bocking.transition_not_allowed'),
-                    $activeRecord->huhApproval_transition,
-                );
+            if (!empty($intersectGroups)) {
+                if ($model->huh_approval_state === static::APPROVAL_STATE_IN_AUDIT) {
+                    $this->checkForLogicException((bool) $activeRecord->huh_approval_confirm_continue);
 
-                throw new TransitionException($model, $activeRecord->huhApproval_transition, $this->entityApprovalStateMachine, $message);
+                    switch ($activeRecord->huh_approval_transition) {
+                        case static::APPROVAL_TRANSITION_ASSIGN_NEW_AUDITOR:
+                            $row = $model->row();
+                            $row['huh_approval_auditor'] = $activeRecord->huh_approval_auditor;
+                            $model->setRow($row);
+                            $model->save();
+
+                            break;
+
+                        case static::APPROVAL_TRANSITION_REQUEST_CHANGE:
+                            $row = $model->row();
+
+                            if (null !== ($userGroups = $this->userUtil->getActiveGroups($backendUser->id))) {
+                                foreach ($userGroups->fetchAll() as $group) {
+                                    if (\in_array($group->id, $intersectGroups)) {
+                                        $row['huh_approval_notes'] = $activeRecord->{'huh_approval_notes'};
+                                        $row['huh_approval_auditor'] = $activeRecord->{'huh_approval_auditor'};
+                                    }
+                                }
+                            }
+                            $model->setRow($row);
+                            $model->save();
+
+                            break;
+
+                        case static::APPROVAL_TRANSITION_APPROVE:
+                    }
+
+                    if ($this->entityApprovalStateMachine->can($model, $activeRecord->huh_approval_transition)) {
+                        $this->entityApprovalStateMachine->apply($model, $activeRecord->huh_approval_transition);
+                    } else {
+                        $this->createTransitionException($model, $activeRecord->row());
+                    }
+                }
             }
         }
     }
 
-    public function onSaveAuditor($value, DataContainer $dc)
+    public function onLoadApprovalTransition($value, DataContainer $dc)
     {
-        $model = $this->modelUtil->findModelInstanceByPk($dc->table, $dc->id);
-
-        if ($this->entityApprovalStateMachine->can($model, static::APPROVAL_TRANSITION_ASSIGN_NEW_AUDITOR)) {
-            $this->entityApprovalStateMachine->apply($model, static::APPROVAL_TRANSITION_ASSIGN_NEW_AUDITOR);
-        }
-
-        return $value;
+        return '';
     }
 
     public function getAvailableTransitions(?DataContainer $dc): array
@@ -155,42 +177,29 @@ class EntityApprovalContainer
     public function getAuditors(?DataContainer $dc): array
     {
         $options = [];
-        $groups = explode(',', $this->bundleConfig[$dc->table]['auditor_groups']);
-        $activeGroups = $this->databaseUtil->findResultsBy('tl_user_group', ['tl_user_group.disable!=?'], ['1'])->fetchAllAssoc();
+        $initialKey = array_search('initial', array_column($this->bundleConfig[$dc->table]['auditor_levels'], 'name'));
 
-        foreach ($activeGroups as $group) {
-            if (\in_array($group['id'], $groups)) {
-                $options[$group['id']] = $group['name'];
+        $groups = [];
+
+        foreach ($this->bundleConfig[$dc->table]['auditor_levels'] as $key => $level) {
+            if ($key === $initialKey) {
+                continue;
+            }
+
+            $groups = array_merge($groups, $level['groups']);
+        }
+
+        if (empty($groups)) {
+            $groups = $this->bundleConfig[$dc->table]['auditor_levels'][$initialKey]['groups'];
+        }
+
+        if (null !== ($users = $this->userUtil->findActiveByGroups($groups))) {
+            foreach ($users->fetchAll() as $user) {
+                $options[$user['id']] = $user['name'].' - '.$user['email'];
             }
         }
 
         return $options;
-    }
-
-    public function onSaveTransition($value, ?DataContainer $dc)
-    {
-        /** @var Model $model */
-        $model = $this->modelUtil->findModelInstanceByPk($dc->table, $dc->id);
-        $activeRecord = $dc->activeRecord;
-
-        if (!(bool) $activeRecord->huhApproval_continue) {
-            $message = $this->translator->trans('huh.entity_approval.bocking.transition_not_accepted');
-
-            throw new LogicException($message, 0);
-        }
-
-        if ($this->entityApprovalStateMachine->can($model, $value)) {
-            $this->entityApprovalStateMachine->apply($model, $value);
-        } else {
-            $message = sprintf(
-                 $this->translator->trans('huh.entity_approval.bocking.transition_not_allowed'),
-                 $value,
-             );
-
-            throw new TransitionException($model, $value, $this->entityApprovalStateMachine, $message);
-        }
-
-        return $value;
     }
 
     public function onPublish($value, DataContainer $dc)
@@ -202,7 +211,7 @@ class EntityApprovalContainer
 
         $activeRecord = $dc->activeRecord->row();
 
-        $state = $activeRecord['huhApproval_state'];
+        $state = $activeRecord['huh_approval_state'];
 
         if ($value === ($this->bundleConfig[$dc->table]['invert_publish_field'] ? '0' : '1') && $state !== static::APPROVAL_STATE_APPROVED) {
             $unpublishValue = $this->bundleConfig[$dc->table]['invert_publish_field'] ? '1' : '0';
@@ -214,7 +223,7 @@ class EntityApprovalContainer
                 [$dc->id]);
 
             $message = sprintf(
-                $this->translator->trans('huh.entity_approval.bocking.publishing_blocked'),
+                $this->translator->trans('huh.entity_approval.blocking.publishing_blocked'),
                 $GLOBALS['TL_LANG']['MSC']['approval_state'][static::APPROVAL_STATE_APPROVED],
                 $GLOBALS['TL_LANG']['MSC']['approval_state'][$state]
             );
@@ -223,5 +232,24 @@ class EntityApprovalContainer
         }
 
         return $value;
+    }
+
+    private function createTransitionException(Model $model, array $activeRecord): void
+    {
+        $message = sprintf(
+            $this->translator->trans('huh.entity_approval.blocking.transition_not_allowed'),
+            $activeRecord['huh_approval_transition'],
+        );
+
+        throw new TransitionException($model, $activeRecord['huh_approval_transition'], $this->entityApprovalStateMachine, $message);
+    }
+
+    private function checkForLogicException(bool $accept = false): void
+    {
+        if (!$accept) {
+            $message = $this->translator->trans('huh.entity_approval.blocking.transition_not_accepted');
+
+            throw new LogicException($message, 0);
+        }
     }
 }

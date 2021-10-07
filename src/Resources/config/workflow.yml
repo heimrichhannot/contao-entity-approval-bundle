@@ -7,7 +7,7 @@ framework:
       marking_store:
         type: 'single_state'
         arguments:
-          - 'huhApproval_state'
+          - 'huh_approval_state'
       supports:
         - Contao\Model
       initial_marking: created

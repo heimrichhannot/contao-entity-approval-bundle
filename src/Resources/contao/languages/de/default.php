@@ -20,9 +20,12 @@ $GLOBALS['TL_LANG']['MSC']['approval_transition'][0] = 'Aktion';
 $GLOBALS['TL_LANG']['MSC']['approval_transition'][1] = 'Wählen Sie hier bitte die Aktion aus, die Sie nach Ihrer Prüfung für die Änderungen vornehmen möchten.';
 
 $GLOBALS['TL_LANG']['MSC']['approval_state'][EntityApprovalContainer::APPROVAL_STATE_CREATED] = 'Erstellt';
+$GLOBALS['TL_LANG']['MSC']['approval_state'][EntityApprovalContainer::APPROVAL_STATE_IN_AUDIT] = 'In Prüfung';
 $GLOBALS['TL_LANG']['MSC']['approval_state'][EntityApprovalContainer::APPROVAL_STATE_APPROVED] = 'Freigegeben';
 $GLOBALS['TL_LANG']['MSC']['approval_state'][EntityApprovalContainer::APPROVAL_STATE_REJECTED] = 'Abgelehnt';
 
+$GLOBALS['TL_LANG']['MSC']['reference'][EntityApprovalContainer::APPROVAL_TRANSITION_SUBMIT] = 'Übermittlung';
+$GLOBALS['TL_LANG']['MSC']['reference'][EntityApprovalContainer::APPROVAL_TRANSITION_ASSIGN_NEW_AUDITOR] = 'Auditor zuordnen';
 $GLOBALS['TL_LANG']['MSC']['reference'][EntityApprovalContainer::APPROVAL_TRANSITION_REQUEST_CHANGE] = 'Änderungen anfragen';
 $GLOBALS['TL_LANG']['MSC']['reference'][EntityApprovalContainer::APPROVAL_TRANSITION_APPROVE] = 'Akzeptieren';
 $GLOBALS['TL_LANG']['MSC']['reference'][EntityApprovalContainer::APPROVAL_TRANSITION_REJECT] = 'Ablehnen';
