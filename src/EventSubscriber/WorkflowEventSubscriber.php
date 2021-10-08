@@ -63,11 +63,11 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
     {
         return [
             'workflow.entity_approval.entered.created' => ['onWorkflowEnteredInitialPlace'],
-//            'workflow.entity_approval.completed.submit' => ['onWorkflowTransitionSubmit'],
-//            'workflow.entity_approval.completed.assign_new_auditor' => ['onWorkflowTransitionAssignAuditor'],
-//            'workflow.entity_approval.completed.request_change' => ['onWorkflowTransitionRequestChange'],
-//            'workflow.entity_approval.completed.approve' => ['onWorkflowTransitionApprove'],
-//            'workflow.entity_approval.completed.reject' => ['onWorkflowTransitionReject']
+            'workflow.entity_approval.completed.submit' => ['onWorkflowTransitionSubmit'],
+            'workflow.entity_approval.completed.assign_new_auditor' => ['onWorkflowTransitionAssignAuditor'],
+            'workflow.entity_approval.completed.request_change' => ['onWorkflowTransitionRequestChange'],
+            'workflow.entity_approval.completed.approve' => ['onWorkflowTransitionApprove'],
+            'workflow.entity_approval.completed.reject' => ['onWorkflowTransitionReject'],
         ];
     }
 

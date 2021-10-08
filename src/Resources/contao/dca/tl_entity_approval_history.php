@@ -11,7 +11,7 @@ $GLOBALS['TL_DCA'][\HeimrichHannot\EntityApprovalBundle\Model\EntityApprovalHist
         'enableVersioning' => false,
         'dynamicPtable' => true,
         'closed' => true,
-        'notEditable' => true,
+        'notEditable' => false,
         'sql' => [
             'keys' => [
                 'id' => 'primary',
@@ -26,7 +26,7 @@ $GLOBALS['TL_DCA'][\HeimrichHannot\EntityApprovalBundle\Model\EntityApprovalHist
             'showColumns' => true,
         ],
         'sorting' => [
-            'mode' => 1,
+            'mode' => 0,
             'fields' => ['dateAdded'],
             'panelLayout' => 'filter;sort,search,limit',
         ],
