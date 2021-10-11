@@ -17,5 +17,5 @@ class NotificationCenterOptionsDto
     public string $type = '';
     public string $auditor = '';
     public string $auditorNew = '';
-    public string $recipients = '';
+    public array $recipients = [];
 }

@@ -11,6 +11,7 @@ use Contao\BackendUser;
 use Contao\DataContainer;
 use Contao\Model;
 use HeimrichHannot\EntityApprovalBundle\Manager\NotificationManager;
+use HeimrichHannot\EntityApprovalBundle\Util\AuditorUtil;
 use HeimrichHannot\UtilsBundle\Database\DatabaseUtil;
 use HeimrichHannot\UtilsBundle\Dca\DcaUtil;
 use HeimrichHannot\UtilsBundle\Model\ModelUtil;
@@ -62,8 +63,10 @@ class EntityApprovalContainer
     protected WorkflowInterface   $entityApprovalStateMachine;
     protected array               $bundleConfig;
     protected DcaUtil             $dcaUtil;
+    protected AuditorUtil         $auditorUtil;
 
     public function __construct(
+        AuditorUtil $auditorUtil,
         DatabaseUtil $databaseUtil,
         DcaUtil $dcaUtil,
         ModelUtil $modelUtil,
@@ -81,6 +84,7 @@ class EntityApprovalContainer
         $this->entityApprovalStateMachine = $entityApprovalStateMachine;
         $this->bundleConfig = $bundleConfig;
         $this->dcaUtil = $dcaUtil;
+        $this->auditorUtil = $auditorUtil;
     }
 
     public function onCreate(string $table, int $id, array $fields, DataContainer $dc): void
@@ -100,7 +104,7 @@ class EntityApprovalContainer
 
         $backendUser = BackendUser::getInstance();
 
-        if (((int) $backendUser->id !== (int) $model->huh_approval_auditor || $model->huh_approval_state === static::APPROVAL_STATE_APPROVED) && !$backendUser->isAdmin) {
+        if (((int) $backendUser->id !== (int) $model->huh_approval_auditor || $model->huh_approval_state === static::APPROVAL_STATE_APPROVED) && !$backendUser->isAdmin()) {
             $message = $this->translator->trans('huh.entity_approval.blocking.modification_not_allowed');
 
             throw new \Exception($message);
@@ -232,6 +236,11 @@ class EntityApprovalContainer
         }
 
         return $value;
+    }
+
+    public function onAuditorOptionsCallback(DataContainer $dc): array
+    {
+        return $this->auditorUtil->getEntityAuditorsByTable($dc->id, $dc->table);
     }
 
     private function createTransitionException(Model $model, array $activeRecord): void

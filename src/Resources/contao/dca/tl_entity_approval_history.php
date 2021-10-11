@@ -100,8 +100,8 @@ $GLOBALS['TL_DCA'][\HeimrichHannot\EntityApprovalBundle\Model\EntityApprovalHist
         ],
         'auditor' => [
             'label' => &$GLOBALS['TL_LANG']['MSC']['approval_auditor'],
-            'inputType' => 'text',
-            'eval' => ['tl_class' => 'clr w50'],
+            'inputType' => 'select',
+            'eval' => ['tl_class' => 'clr w50', 'chosen' => true, 'multiple' => true],
             'sql' => "varchar(255) NOT NULL default ''",
         ],
         'informAuthor' => [

@@ -10,6 +10,7 @@ namespace HeimrichHannot\EntityApprovalBundle\Manager;
 use Contao\BackendUser;
 use Contao\CoreBundle\DataContainer\PaletteManipulator;
 use Contao\Input;
+use Contao\StringUtil;
 use HeimrichHannot\EntityApprovalBundle\DataContainer\EntityApprovalContainer;
 use HeimrichHannot\UtilsBundle\Dca\DcaUtil;
 use HeimrichHannot\UtilsBundle\Model\ModelUtil;
@@ -52,16 +53,21 @@ class DcaManager
             return;
         }
 
-        $author = $entity->row()[$this->bundleConfig[$table]['author_field']];
+        $author = $entity->row()[$this->bundleConfig[$table]['author_email_field']];
 
         $dca = &$GLOBALS['TL_DCA'][$table];
 
         $backendUser = BackendUser::getInstance();
 
-        if (((int) $backendUser->id === (int) $author || (int) $backendUser->id !== (int) $entity->huh_approval_auditor) ||
+        if (((string) $backendUser->email === (string) $author || \in_array((string) $backendUser->id, StringUtil::deserialize($entity->huh_approval_auditor, true))) &&
             EntityApprovalContainer::APPROVAL_STATE_IN_AUDIT !== $entity->huh_approval_state
         ) {
-            unset($dca['fields']['huh_approval_auditor'], $dca['fields']['huh_approval_transition'], $dca['fields']['huh_approval_inform_author'], $dca['fields']['huh_approval_confirm_continue'], $dca['fields']['huh_approval_notes']);
+            unset($dca['fields']['huh_approval_auditor'],
+                $dca['fields']['huh_approval_transition'],
+                $dca['fields']['huh_approval_inform_author'],
+                $dca['fields']['huh_approval_confirm_continue'],
+                $dca['fields']['huh_approval_notes']
+            );
 
             foreach ($this->bundleConfig[$table]['auditor_levels'] as $level) {
                 unset($dca['fields']['huh_approval_state_'.b($level['name'])->lower()]);
@@ -134,7 +140,7 @@ class DcaManager
                 'search' => true,
                 'sorting' => true,
                 'inputType' => 'select',
-                'options_callback' => [EntityApprovalContainer::class, 'getAuditors'],
+                'options_callback' => [EntityApprovalContainer::class, 'onAuditorOptionsCallback'],
                 'eval' => ['multiple' => false, 'mandatory' => false, 'tl_class' => 'clr w50', 'includeBlankOption' => true],
                 'attributes' => ['legend' => 'publish_legend', 'fe_sorting' => true, 'fe_search' => true],
                 'sql' => 'blob NULL',

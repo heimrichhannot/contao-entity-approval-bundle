@@ -30,17 +30,19 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
 {
     const ENTITY_APPROVAL_WORKFLOW_NAME = 'entity_approval';
 
-    protected TranslatorInterface $translator;
-    protected LoggerInterface     $logger;
-    protected WorkflowInterface   $entityApprovalStateMachine;
-    protected array               $bundleConfig;
-    protected UserUtil            $userUtil;
-    protected NotificationManager $notificationManager;
-    protected ModelUtil           $modelUtil;
-    protected DatabaseUtil        $databaseUtil;
+    protected TranslatorInterface     $translator;
+    protected LoggerInterface         $logger;
+    protected WorkflowInterface       $entityApprovalStateMachine;
+    protected array                   $bundleConfig;
+    protected UserUtil                $userUtil;
+    protected NotificationManager     $notificationManager;
+    protected ModelUtil               $modelUtil;
+    protected DatabaseUtil            $databaseUtil;
+    protected EntityApprovalContainer $entityApprovalContainer;
 
     public function __construct(
         DatabaseUtil $databaseUtil,
+        EntityApprovalContainer $entityApprovalContainer,
         LoggerInterface $logger,
         ModelUtil $modelUtil,
         NotificationManager $notificationManager,
@@ -57,6 +59,7 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
         $this->notificationManager = $notificationManager;
         $this->modelUtil = $modelUtil;
         $this->databaseUtil = $databaseUtil;
+        $this->entityApprovalContainer = $entityApprovalContainer;
     }
 
     public static function getSubscribedEvents()
@@ -83,7 +86,7 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
             $model->getTable(),
             $event->getTransition()->getName(),
             array_search(1, $event->getMarking()->getPlaces(), true),
-            $model->huh_approval_auditor,
+            StringUtil::deserialize($model->huh_approval_auditor, true),
             $model->huh_approval_notes,
             $model->huh_approval_inform_author,
             $backendUser->id
@@ -102,30 +105,24 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
         $model = $event->getSubject();
         $table = $model->getTable();
 
-        $key = array_search('initial', array_column($this->bundleConfig[$table]['auditor_levels'], 'name'));
-
-        if (empty($groups = $this->bundleConfig[$table]['auditor_levels'][$key]['groups'])) {
-            return;
-        }
-
         /** @var Collection $users */
-        if (null === ($users = $this->userUtil->findActiveByGroups($groups))) {
+        if (null === ($users = $this->userUtil->findActiveByGroups($this->bundleConfig[$table]['auditor_levels'][0]['groups']))) {
             return;
         }
 
         $auditors = $users->fetchAll();
 
         //select initial auditor and send notification
-        $mode = $this->bundleConfig[$table]['auditor_levels'][$key]['mode'];
+        $mode = $this->bundleConfig[$table]['auditor_levels'][0]['mode'];
         $options = new NotificationCenterOptionsDto();
 
         if (Configuration::AUDITOR_MODE_RANDOM === $mode) {
             $random = array_rand($auditors);
-            $options->recipients = $auditors[$random]['email'];
-            $auditor = $auditors[$random]['id'];
+            $options->recipients = [$auditors[$random]['email']];
+            $auditor = [$auditors[$random]['id']];
         } else {
-            $options->recipients = implode(',', array_column($auditors, 'email'));
-            $auditor = implode(',', array_column($auditors, 'id'));
+            $options->recipients = array_column($auditors, 'email');
+            $auditor = array_column($auditors, 'id');
         }
 
         $options->type = NotificationManager::NOTIFICATION_TYPE_STATE_CHANGED;
@@ -133,12 +130,12 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
         $options->transition = $event->getTransition()->getName();
         $options->table = $table;
         $options->entityId = $model->id;
-        $options->author = $model->{$this->bundleConfig[$table]['author_email_field']};
+        $options->author = $model->author ?? '';
 
         $this->notificationManager->sendMail($options);
 
         $model->huh_approval_state = EntityApprovalContainer::APPROVAL_STATE_IN_AUDIT;
-        $model->huh_approval_auditor_initial = $options->recipients;
+        $model->huh_approval_auditor = serialize($auditor);
         $model->save();
 
         $backendUser = BackendUser::getInstance();
@@ -159,7 +156,7 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
     {
         /** @var Model $model */
         $model = $event->getSubject();
-        $informAuthor = $model->huh_approval_inform_author;
+        $informAuthor = (bool) $model->huh_approval_inform_author;
         $table = $model->getTable();
 
         if (!empty($model->huh_approval_auditor)) {
@@ -188,7 +185,7 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
             $backendUser->id
         );
 
-        if ((bool) $informAuthor) {
+        if ($informAuthor) {
             $this->informAuthor(
                 $table,
                 $auditor->id,
@@ -312,7 +309,7 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
         if (\in_array(false, $levelApproval, true)) {
             // select next level
             $levelName = array_search(false, $levelApproval);
-            $newAuditors = $this->getAuditorFromGroups($table, $levelName);
+            $newAuditors = $this->entityApprovalContainer->getAuditorFromGroups($table, $levelName);
 
             if (!empty($model->huh_approval_auditor)) {
                 $options = new NotificationCenterOptionsDto();
@@ -411,10 +408,10 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
         if (Configuration::AUDITOR_MODE_RANDOM === $mode) {
             $random = array_rand($auditors);
             $options->recipients = $auditors[$random]['email'];
-            $auditor = serialize(array_column($auditors, 'id')[$random]);
+            $auditor = array_column($auditors, 'id')[$random];
         } else {
-            $options->recipients = implode(',', array_column($auditors, 'email'));
-            $auditor = serialize(array_column($auditors, 'id'));
+            $options->recipients = array_column($auditors, 'email');
+            $auditor = array_column($auditors, 'id');
         }
 
         $entityAuthor = $model->{$this->bundleConfig[$table]['author_email_field']};
@@ -438,7 +435,7 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
         string $table,
         string $transition,
         string $state,
-        string $auditor,
+        array $auditor,
         string $notes,
         bool $informAuthor,
         string $author,
@@ -450,7 +447,7 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
         $historyModel->dateAdded = time();
         $historyModel->transition = $transition;
         $historyModel->state = $state;
-        $historyModel->auditor = $auditor;
+        $historyModel->auditor = serialize($auditor);
         $historyModel->notes = $notes;
         $historyModel->author = $author;
         $historyModel->authorType = $authorType;
@@ -458,11 +455,11 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
         $historyModel->save();
     }
 
-    private function informAuthor(string $table, string $auditor, string $author, string $state): void
+    private function informAuthor(string $table, string $auditor, array $author, string $state): void
     {
         $options = new NotificationCenterOptionsDto();
         $options->table = $table;
-        $options->author = $author;
+        $options->author = implode(',', $author);
         $options->auditor = $auditor;
         $options->state = $state;
         $options->type = NotificationManager::NOTIFICATION_TYPE_AUDITOR_CHANGED;
@@ -470,51 +467,29 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
         $this->notificationManager->sendMail($options);
     }
 
-    private function getAuditorFromGroups(string $table, string $levelName): string
-    {
-        $groups = $this->bundleConfig[$table]['auditor_levels'][$levelName]['groups'];
-        $mode = $this->bundleConfig[$table]['auditor_levels'][$levelName]['mode'];
-
-        /** @var Collection $users */
-        if (null === ($users = $this->userUtil->findActiveByGroups($groups))) {
-            return '';
-        }
-
-        $auditors = $users->fetchAll();
-
-        if (Configuration::AUDITOR_MODE_RANDOM === $mode) {
-            $random = array_rand($auditors);
-            $auditor = serialize(array_column($auditors, 'id')[$random]);
-        } else {
-            $auditor = serialize(array_column($auditors, 'id'));
-        }
-
-        return $auditor;
-    }
-
-    private function collectAllAuditorEmails(string $table): string
+    private function collectAllAuditorEmails(string $table): array
     {
         $groups = array_values(array_column($this->bundleConfig[$table]['auditor_levels'], 'groups'));
 
         /** @var Collection $users */
         if (null === ($users = $this->userUtil->findActiveByGroups($groups))) {
-            return '';
+            return [];
         }
 
         $auditors = $users->fetchAll();
 
-        return implode(',', array_column($auditors, 'email'));
+        return array_column($auditors, 'email');
     }
 
-    private function collectAuditorEmails(string $users): string
+    private function collectAuditorEmails(array $userIds): array
     {
         /** @var Collection $users */
-        if (null === ($users = $this->databaseUtil->findResultByPk('tl_user', StringUtil::deserialize($users, true)))) {
-            return '';
+        if (null === ($users = $this->databaseUtil->findResultByPk('tl_user', $userIds))) {
+            return [];
         }
 
         $auditors = $users->fetchAll();
 
-        return implode(',', array_column($auditors, 'email'));
+        return array_column($auditors, 'email');
     }
 }

@@ -43,7 +43,7 @@ class NotificationManager
             while ($notificationCollection->next()) {
                 $notification = $notificationCollection->current();
                 $tokens = $this->generateTokens($options);
-                $tokens['recipient_email'] = $options->recipients;
+                $tokens['recipient_email'] = implode(',', $options->recipients);
 
                 $notification->send($tokens);
             }

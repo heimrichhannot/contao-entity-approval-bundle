@@ -7,4 +7,4 @@ services:
       $bundleConfig: '%huh_entity_approval%'
 
   HeimrichHannot\EntityApprovalBundle\:
-    resource: "../../{DataContainer,EventListener,EventSubscriber,Manager}/*"
+    resource: "../../{DataContainer,EventListener,EventSubscriber,Manager,Util}/*"
