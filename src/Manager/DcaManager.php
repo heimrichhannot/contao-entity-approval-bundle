@@ -69,9 +69,11 @@ class DcaManager
 
         $backendUser = BackendUser::getInstance();
 
-        if (((string) $backendUser->email === (string) $author || !\in_array((string) $backendUser->id, StringUtil::deserialize($entity->huh_approval_auditor, true))) &&
-            EntityApprovalContainer::APPROVAL_STATE_IN_AUDIT !== $entity->huh_approval_state ||
-            !$backendUser->isAdmin
+        if (
+            (((string) $backendUser->email === (string) $author ||
+            !\in_array((string) $backendUser->id, StringUtil::deserialize($entity->huh_approval_auditor, true))) &&
+            EntityApprovalContainer::APPROVAL_STATE_IN_AUDIT !== $entity->huh_approval_state) ||
+            $backendUser->isAdmin
         ) {
             unset($dca['fields']['huh_approval_auditor'],
                 $dca['fields']['huh_approval_transition'],
@@ -79,11 +81,11 @@ class DcaManager
                 $dca['fields']['huh_approval_confirm_continue'],
                 $dca['fields']['huh_approval_notes']
             );
+        }
 
-            foreach ($this->bundleConfig[$table]['auditor_levels'] as $level) {
-                // b is symfony ByteString function, see use section at the top
-                unset($dca['fields']['huh_approval_state_'.b($level['name'])->lower()]);
-            }
+        foreach ($this->bundleConfig[$table]['auditor_levels'] as $level) {
+            // b is symfony ByteString function, see use section at the top
+            unset($dca['fields']['huh_approval_state_'.b($level['name'])->lower()]);
         }
 
         $dca['config']['onsubmit_callback'][] = [EntityApprovalContainer::class, 'onSubmit'];
@@ -160,8 +162,8 @@ class DcaManager
                 'label' => &$GLOBALS['TL_LANG']['MSC']['approval_transition'],
                 'filter' => true,
                 'inputType' => 'select',
+                'load_callback' => [[EntityApprovalContainer::class, 'onLoadApprovalTransition']],
                 'options_callback' => [EntityApprovalContainer::class, 'getAvailableTransitions'],
-                'load_callback' => [EntityApprovalContainer::class, 'onLoadApprovalTransition'],
                 'eval' => ['tl_class' => 'w50', 'includeBlankOption' => true],
                 'sql' => "varchar(64) NOT NULL default ''",
             ],

@@ -48,7 +48,7 @@ class AuditorUtil
             }
         }
 
-        return [];
+        return $options;
     }
 
     public function getAuditorFromGroups(string $table, string $levelName): array

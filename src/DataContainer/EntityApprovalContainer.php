@@ -92,6 +92,7 @@ class EntityApprovalContainer
         /** @var Model $model */
         $model = $this->modelUtil->findModelInstanceByPk($dc->table, $dc->id);
         $activeRecord = $dc->activeRecord;
+        $activeRow = $dc->activeRecord->row();
         $backendUser = BackendUser::getInstance();
 
         if ($model->huh_approval_state === static::APPROVAL_STATE_CREATED) {
@@ -101,15 +102,22 @@ class EntityApprovalContainer
         } elseif (((int) $backendUser->id !== (int) $model->huh_approval_auditor || $model->huh_approval_state === static::APPROVAL_STATE_APPROVED) && !$backendUser->isAdmin) {
             $message = $this->translator->trans('huh.entity_approval.blocking.modification_not_allowed');
 
-            throw new LogicException($message);
-        } else {
-            $this->applyApprovalModelChanges($model, $activeRecord);
+            throw new \Exception($message);
         }
+//        else {
+//            $this->applyApprovalModelChanges($model, $activeRecord);
+//        }
 
-        if ($this->entityApprovalStateMachine->can($model, $activeRecord->huh_approval_transition)) {
-            $this->entityApprovalStateMachine->apply($model, $activeRecord->huh_approval_transition);
-        } else {
-            $this->createTransitionException($model, $activeRecord->row());
+        $test = $dc->activeRecord->fetchAllAssoc();
+        $a = $dc->activeRecord->row();
+        $transition = $dc->activeRecord->huh_approval_transition;
+
+        if (!empty($activeRecord->huh_approval_transition)) {
+            if ($this->entityApprovalStateMachine->can($model, $activeRecord->huh_approval_transition)) {
+                $this->entityApprovalStateMachine->apply($model, $activeRecord->huh_approval_transition);
+            } else {
+                $this->createTransitionException($model, $activeRow);
+            }
         }
     }
 

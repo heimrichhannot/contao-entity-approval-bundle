@@ -9,7 +9,6 @@ namespace HeimrichHannot\EntityApprovalBundle\EventSubscriber;
 
 use Contao\BackendUser;
 use Contao\Model;
-use Contao\StringUtil;
 use HeimrichHannot\EntityApprovalBundle\DataContainer\EntityApprovalContainer;
 use HeimrichHannot\EntityApprovalBundle\DependencyInjection\Configuration;
 use HeimrichHannot\EntityApprovalBundle\Dto\NotificationCenterOptionsDto;
@@ -81,22 +80,19 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
         $model->huh_aproval_auditor = $model->huh_approval_auditor ?: $this->getInitialAuditor($event);
 
         $backendUser = BackendUser::getInstance();
-        $this->createHistoryEntry(
-            $model->id,
-            $model->getTable(),
-            $event->getTransition()->getName(),
-            array_search(1, $event->getMarking()->getPlaces(), true),
-            StringUtil::deserialize($model->huh_approval_auditor, true),
-            $model->huh_approval_notes,
-            $model->huh_approval_inform_author,
-            $backendUser->id
-        );
 
-        $model->huh_approval_notes = '';
-        $model->huh_approval_inform_author = '';
-        $model->huh_approval_transition = '';
-        $model->huh_approval_confirm_continue = '';
-        $model->save();
+        $historyModel = new EntityApprovalHistoryModel();
+        $historyModel->pid = $model->id;
+        $historyModel->ptable = $model->getTable();
+        $historyModel->transition = $event->getTransition()->getName();
+        $historyModel->state = array_search(1, $event->getMarking()->getPlaces(), true);
+        $historyModel->auditor = $model->huh_approval_auditor;
+        $historyModel->notes = $model->huh_approval_notes;
+        $historyModel->author = $backendUser->id;
+        $historyModel->informAuthor = $model->huh_approval_inform_author;
+        $this->saveHistoryEntry($historyModel);
+
+        $this->resetModelApprovalValues($model, ['state' => $model->huh_approval_state]);
     }
 
     public function onWorkflowTransitionSubmit(CompletedEvent $event)
@@ -140,16 +136,15 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
 
         $backendUser = BackendUser::getInstance();
 
-        $this->createHistoryEntry(
-            $model->id,
-            $table,
-            EntityApprovalContainer::APPROVAL_TRANSITION_SUBMIT,
-            EntityApprovalContainer::APPROVAL_STATE_IN_AUDIT,
-            $auditor,
-            '',
-            false,
-            $backendUser->id
-        );
+        $history = new EntityApprovalHistoryModel();
+        $history->pid = $model->id;
+        $history->ptable = $table;
+        $history->transition = EntityApprovalContainer::APPROVAL_TRANSITION_SUBMIT;
+        $history->state = EntityApprovalContainer::APPROVAL_STATE_IN_AUDIT;
+        $history->auditor = $auditor;
+        $history->author = $backendUser->id;
+        $history->informAuthor = false;
+        $this->saveHistoryEntry($history);
     }
 
     public function onWorkflowTransitionAssignAuditor(CompletedEvent $event)
@@ -167,23 +162,25 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
                 $options->auditor = $auditor->id;
                 $options->state = EntityApprovalContainer::APPROVAL_STATE_IN_AUDIT;
                 $options->type = NotificationManager::NOTIFICATION_TYPE_AUDITOR_CHANGED;
-                $options->recipients = $auditor->email;
+                $options->recipients = [$auditor->email];
                 $this->notificationManager->sendMail($options);
             }
         }
 
         $backendUser = BackendUser::getInstance();
 
-        $this->createHistoryEntry(
-            $model->id,
-            $table,
-            EntityApprovalContainer::APPROVAL_TRANSITION_ASSIGN_NEW_AUDITOR,
-            EntityApprovalContainer::APPROVAL_STATE_IN_AUDIT,
-            $model->huh_approval_auditor,
-            $model->huh_approval_notes,
-            $informAuthor,
-            $backendUser->id
-        );
+        $history = new EntityApprovalHistoryModel();
+        $history->pid = $model->id;
+        $history->ptable = $table;
+        $history->dateAdded = time();
+        $history->transition = EntityApprovalContainer::APPROVAL_TRANSITION_ASSIGN_NEW_AUDITOR;
+        $history->state = EntityApprovalContainer::APPROVAL_STATE_IN_AUDIT;
+        $history->auditor = serialize([$model->huh_approval_auditor]);
+        $history->notes = $model->huh_approval_notes;
+        $history->author = $backendUser->id;
+        $history->informAuthor = $informAuthor;
+
+        $this->saveHistoryEntry($history);
 
         if ($informAuthor) {
             $this->informAuthor(
@@ -194,12 +191,7 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
             );
         }
 
-        $model->huh_approval_notes = '';
-        $model->huh_approval_state = EntityApprovalContainer::APPROVAL_STATE_IN_AUDIT;
-        $model->huh_approval_transition = '';
-        $model->huh_approval_inform_author = '';
-        $model->huh_approval_confirm_continue = '';
-        $model->save();
+        $this->resetModelApprovalValues($model, ['state' => EntityApprovalContainer::APPROVAL_STATE_IN_AUDIT]);
     }
 
     public function onWorkflowTransitionRequestChange(CompletedEvent $event)
@@ -226,16 +218,16 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
 
         $backendUser = BackendUser::getInstance();
 
-        $this->createHistoryEntry(
-            $model->id,
-            $table,
-            EntityApprovalContainer::APPROVAL_TRANSITION_REQUEST_CHANGE,
-            EntityApprovalContainer::APPROVAL_STATE_IN_AUDIT,
-            $model->huh_approval_auditor,
-            $model->huh_approval_notes,
-            $informAuthor,
-            $backendUser->id
-        );
+        $history = new EntityApprovalHistoryModel();
+        $history->pid = $model->id;
+        $history->ptable = $table;
+        $history->transition = EntityApprovalContainer::APPROVAL_TRANSITION_REQUEST_CHANGE;
+        $history->state = EntityApprovalContainer::APPROVAL_STATE_IN_AUDIT;
+        $history->auditor = serialize([$model->huh_approval_auditor]);
+        $history->notes = $model->huh_approval_notes;
+        $history->author = $backendUser->id;
+        $history->informAuthor = $informAuthor;
+        $this->saveHistoryEntry($history);
 
         if ($informAuthor) {
             $this->informAuthor(
@@ -246,12 +238,7 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
             );
         }
 
-        $model->huh_approval_state = EntityApprovalContainer::APPROVAL_STATE_CREATED;
-        $model->huh_approval_inform_author = '';
-        $model->huh_approval_confirm_continue = '';
-        $model->huh_approval_notes = '';
-        $model->huh_approval_transition = '';
-        $model->save();
+        $this->resetModelApprovalValues($model, ['state' => EntityApprovalContainer::APPROVAL_STATE_CREATED]);
     }
 
     public function onWorkflowTransitionApprove(EnteredEvent $event)
@@ -265,17 +252,16 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
         $backendUser = BackendUser::getInstance();
         $author = $model->{$this->bundleConfig[$table]['author_email_field']};
 
-        // create history
-        $this->createHistoryEntry(
-            $model->id,
-            $table,
-            $event->getTransition()->getName(),
-            $state,
-            $model->huh_approval_auditor,
-            $model->huh_approval_notes,
-            $informAuthor,
-            $backendUser->id
-        );
+        $history = new EntityApprovalHistoryModel();
+        $history->pid = $model->id;
+        $history->ptable = $table;
+        $history->transition = $event->getTransition()->getName();
+        $history->state = $state;
+        $history->auditor = serialize([$model->huh_approval_auditor]);
+        $history->notes = $model->huh_approval_notes;
+        $history->author = $backendUser->id;
+        $history->informAuthor = $informAuthor;
+        $this->saveHistoryEntry($history);
 
         // check if all auditors approved
         $history = $this->databaseUtil->findResultsBy(
@@ -328,11 +314,7 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
             $model->huh_approval_state = EntityApprovalContainer::APPROVAL_STATE_APPROVED;
         }
 
-        $model->huh_approval_inform_author = '';
-        $model->huh_approval_confirm_continue = '';
-        $model->huh_approval_notes = '';
-        $model->huh_approval_transition = '';
-        $model->save();
+        $this->resetModelApprovalValues($model, ['state' => $model->huh_approval_state]);
 
         // send mail to author
         if ((bool) $model->huh_approval_inform_author) {
@@ -351,25 +333,20 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
         $backendUser = BackendUser::getInstance();
         $author = $model->{$this->bundleConfig[$table]['author_email_field']};
 
-        // create history
-        $this->createHistoryEntry(
-            $model->id,
-            $table,
-            $event->getTransition()->getName(),
-            $state,
-            $model->huh_approval_auditor,
-            $model->huh_approval_notes,
-            $informAuthor,
-            $backendUser->id
-        );
+        $history = new EntityApprovalHistoryModel();
+        $history->pid = $model->id;
+        $history->ptable = $table;
+        $history->transition = $event->getTransition()->getName();
+        $history->state = $state;
+        $history->auditor = serialize([$model->huh_approval_auditor]);
+        $history->notes = $model->huh_approval_notes;
+        $history->author = $backendUser->id;
+        $history->informAuthor = $informAuthor;
+
+        $this->saveHistoryEntry($history);
 
         // reject entity
-        $model->huh_approval_state = $state;
-        $model->huh_approval_inform_author = '';
-        $model->huh_approval_confirm_continue = '';
-        $model->huh_approval_notes = '';
-        $model->huh_approval_transition = '';
-        $model->save();
+        $this->resetModelApprovalValues($model, ['state' => $state]);
 
         // send mail to all auditors
         $options = new NotificationCenterOptionsDto();
@@ -430,29 +407,12 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
         return $auditor;
     }
 
-    private function createHistoryEntry(
-        int $entityId,
-        string $table,
-        string $transition,
-        string $state,
-        array $auditor,
-        string $notes,
-        bool $informAuthor,
-        string $author,
-        string $authorType = 'user'
-    ): void {
-        $historyModel = new EntityApprovalHistoryModel();
-        $historyModel->pid = $entityId;
-        $historyModel->ptable = $table;
-        $historyModel->dateAdded = time();
-        $historyModel->transition = $transition;
-        $historyModel->state = $state;
-        $historyModel->auditor = serialize($auditor);
-        $historyModel->notes = $notes;
-        $historyModel->author = $author;
-        $historyModel->authorType = $authorType;
-        $historyModel->informAuthor = $informAuthor;
-        $historyModel->save();
+    private function saveHistoryEntry(EntityApprovalHistoryModel $model): void
+    {
+        $model->dateAdded = $model->dateAdded ?? time();
+        $model->authorType = $model->authorType ?? 'user';
+        $model->notes = $model->notes ?? '';
+        $model->save();
     }
 
     private function informAuthor(string $table, string $auditor, array $author, string $state): void
@@ -491,5 +451,15 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
         $auditors = $users->fetchAll();
 
         return array_column($auditors, 'email');
+    }
+
+    private function resetModelApprovalValues(Model $model, array $options = [])
+    {
+        $model->huh_approval_notes = $options['notes'] ?? '';
+        $model->huh_approval_state = $options['state'] ?? '';
+        $model->huh_approval_inform_author = $options['inform_author'] ?? '';
+        $model->huh_approval_transition = $options['transition'] ?? '';
+        $model->huh_approval_confirm_continue = $options['confirm_continue'] ?? '';
+        $model->save();
     }
 }
