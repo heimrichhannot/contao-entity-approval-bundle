@@ -87,75 +87,29 @@ class EntityApprovalContainer
         $this->auditorUtil = $auditorUtil;
     }
 
-    public function onCreate(string $table, int $id, array $fields, DataContainer $dc): void
-    {
-        $model = $this->modelUtil->findModelInstanceByPk($table, $id);
-
-        if ($this->entityApprovalStateMachine->can($model, static::APPROVAL_TRANSITION_SUBMIT)) {
-            $this->entityApprovalStateMachine->apply($model, static::APPROVAL_TRANSITION_SUBMIT);
-        }
-    }
-
     public function onSubmit(?DataContainer $dc): void
     {
         /** @var Model $model */
         $model = $this->modelUtil->findModelInstanceByPk($dc->table, $dc->id);
         $activeRecord = $dc->activeRecord;
-
         $backendUser = BackendUser::getInstance();
 
-        if (((int) $backendUser->id !== (int) $model->huh_approval_auditor || $model->huh_approval_state === static::APPROVAL_STATE_APPROVED) && !$backendUser->isAdmin()) {
+        if ($model->huh_approval_state === static::APPROVAL_STATE_CREATED) {
+            if (empty($activeRecord->huh_approval_transition)) {
+                $activeRecord->huh_approval_transition = static::APPROVAL_TRANSITION_SUBMIT;
+            }
+        } elseif (((int) $backendUser->id !== (int) $model->huh_approval_auditor || $model->huh_approval_state === static::APPROVAL_STATE_APPROVED) && !$backendUser->isAdmin) {
             $message = $this->translator->trans('huh.entity_approval.blocking.modification_not_allowed');
 
-            throw new \Exception($message);
+            throw new LogicException($message);
+        } else {
+            $this->applyApprovalModelChanges($model, $activeRecord);
         }
 
-        foreach ($this->bundleConfig[$model->getTable()]['auditor_levels'] as $level) {
-            if (null !== ($userGroups = $this->userUtil->getActiveGroups($backendUser->id))) {
-                $userGroups = array_map('strval', array_column($userGroups->fetchAll(), 'id'));
-                $levelGroups = array_map('strval', $level['groups']);
-                $intersectGroups = array_intersect($levelGroups, $userGroups);
-            }
-
-            if (!empty($intersectGroups)) {
-                if ($model->huh_approval_state === static::APPROVAL_STATE_IN_AUDIT) {
-                    $this->checkForLogicException((bool) $activeRecord->huh_approval_confirm_continue);
-
-                    switch ($activeRecord->huh_approval_transition) {
-                        case static::APPROVAL_TRANSITION_ASSIGN_NEW_AUDITOR:
-                            $row = $model->row();
-                            $row['huh_approval_auditor'] = $activeRecord->huh_approval_auditor;
-                            $model->setRow($row);
-                            $model->save();
-
-                            break;
-
-                        case static::APPROVAL_TRANSITION_REQUEST_CHANGE:
-                            $row = $model->row();
-
-                            if (null !== ($userGroups = $this->userUtil->getActiveGroups($backendUser->id))) {
-                                foreach ($userGroups->fetchAll() as $group) {
-                                    if (\in_array($group->id, $intersectGroups)) {
-                                        $row['huh_approval_notes'] = $activeRecord->{'huh_approval_notes'};
-                                        $row['huh_approval_auditor'] = $activeRecord->{'huh_approval_auditor'};
-                                    }
-                                }
-                            }
-                            $model->setRow($row);
-                            $model->save();
-
-                            break;
-
-                        case static::APPROVAL_TRANSITION_APPROVE:
-                    }
-
-                    if ($this->entityApprovalStateMachine->can($model, $activeRecord->huh_approval_transition)) {
-                        $this->entityApprovalStateMachine->apply($model, $activeRecord->huh_approval_transition);
-                    } else {
-                        $this->createTransitionException($model, $activeRecord->row());
-                    }
-                }
-            }
+        if ($this->entityApprovalStateMachine->can($model, $activeRecord->huh_approval_transition)) {
+            $this->entityApprovalStateMachine->apply($model, $activeRecord->huh_approval_transition);
+        } else {
+            $this->createTransitionException($model, $activeRecord->row());
         }
     }
 
@@ -243,6 +197,19 @@ class EntityApprovalContainer
         return $this->auditorUtil->getEntityAuditorsByTable($dc->id, $dc->table);
     }
 
+    private function applyApprovalModelChanges(Model $model, $activeRecord): void
+    {
+        if ($model->huh_approval_state === static::APPROVAL_STATE_IN_AUDIT) {
+            $this->checkForLogicException((bool) $activeRecord->huh_approval_confirm_continue);
+
+            $row = $model->row();
+            $row['huh_approval_notes'] = $activeRecord->{'huh_approval_notes'};
+            $row['huh_approval_auditor'] = $activeRecord->{'huh_approval_auditor'};
+            $model->setRow($row);
+            $model->save();
+        }
+    }
+
     private function createTransitionException(Model $model, array $activeRecord): void
     {
         $message = sprintf(
@@ -255,7 +222,9 @@ class EntityApprovalContainer
 
     private function checkForLogicException(bool $accept = false): void
     {
-        if (!$accept) {
+        $backendUser = BackendUser::getInstance();
+
+        if (!$accept && !$backendUser->isAdmin) {
             $message = $this->translator->trans('huh.entity_approval.blocking.transition_not_accepted');
 
             throw new LogicException($message, 0);

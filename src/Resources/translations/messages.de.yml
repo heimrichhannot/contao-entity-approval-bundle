@@ -2,7 +2,7 @@ huh:
   entity_approval:
     blocking:
       modification_not_allowed: 'Sie dürfen diese Entität aufgrund des Genehmigungs-Workflows nicht bearbeiten.'
-      transition_not_allowed: 'Die Aktion <b>%s</b> ist nicht erlaubt'
+      transition_not_allowed: "Die Aktion %s ist nicht erlaubt"
       transition_is_null: Ein Übergang von %s zu %s konnte nicht gefunden werden
       transition_not_accepted: Um diesen Vorgang durchzuführen, müssen Sie akzeptieren dass sie fortfahren möchten.
       publishing_blocked: "Dieser Datensatz kann nicht veröffentlicht werden. Für die Veröffentlichung muss der Status '%s' sein. Aktueller Status ist '%s'."

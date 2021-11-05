@@ -12,28 +12,32 @@ use Contao\CoreBundle\DataContainer\PaletteManipulator;
 use Contao\Input;
 use Contao\StringUtil;
 use HeimrichHannot\EntityApprovalBundle\DataContainer\EntityApprovalContainer;
+use HeimrichHannot\EntityApprovalBundle\Event\BeforeEntityGetModelEvent;
 use HeimrichHannot\UtilsBundle\Dca\DcaUtil;
 use HeimrichHannot\UtilsBundle\Model\ModelUtil;
 use HeimrichHannot\UtilsBundle\User\UserUtil;
 use HeimrichHannot\UtilsBundle\Util\Container\ContainerUtil;
 use function Symfony\Component\String\b;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 class DcaManager
 {
-    protected array               $bundleConfig;
-    protected DcaUtil             $dcaUtil;
-    protected UserUtil            $userUtil;
-    protected ModelUtil           $modelUtil;
-    protected ContainerUtil       $containerUtil;
-    protected TranslatorInterface $translator;
+    protected array                    $bundleConfig;
+    protected DcaUtil                  $dcaUtil;
+    protected UserUtil                 $userUtil;
+    protected ModelUtil                $modelUtil;
+    protected ContainerUtil            $containerUtil;
+    protected TranslatorInterface      $translator;
+    protected EventDispatcherInterface $eventDispatcher;
 
     public function __construct(
         ContainerUtil $containerUtil,
         DcaUtil $dcaUtil,
-        UserUtil $userUtil,
+        EventDispatcherInterface $eventDispatcher,
         ModelUtil $modelUtil,
         TranslatorInterface $translator,
+        UserUtil $userUtil,
         array $bundleConfig)
     {
         $this->bundleConfig = $bundleConfig;
@@ -42,6 +46,7 @@ class DcaManager
         $this->modelUtil = $modelUtil;
         $this->containerUtil = $containerUtil;
         $this->translator = $translator;
+        $this->eventDispatcher = $eventDispatcher;
     }
 
     public function addApprovalToDca(string $table): void
@@ -49,7 +54,12 @@ class DcaManager
         $this->dcaUtil->loadDc($table);
         $this->addApprovalFieldsToDca($table);
 
-        if (null === ($entity = $this->modelUtil->findModelInstanceByPk($table, Input::get('id')))) {
+        $entityId = Input::get('id') ?? '';
+
+        /** @var BeforeEntityGetModelEvent $event */
+        $event = $this->eventDispatcher->dispatch(new BeforeEntityGetModelEvent($table, $entityId), BeforeEntityGetModelEvent::NAME);
+
+        if (null === ($entity = $this->modelUtil->findModelInstanceByPk($event->getTable(), $event->getEntityId()))) {
             return;
         }
 
@@ -59,8 +69,9 @@ class DcaManager
 
         $backendUser = BackendUser::getInstance();
 
-        if (((string) $backendUser->email === (string) $author || \in_array((string) $backendUser->id, StringUtil::deserialize($entity->huh_approval_auditor, true))) &&
-            EntityApprovalContainer::APPROVAL_STATE_IN_AUDIT !== $entity->huh_approval_state
+        if (((string) $backendUser->email === (string) $author || !\in_array((string) $backendUser->id, StringUtil::deserialize($entity->huh_approval_auditor, true))) &&
+            EntityApprovalContainer::APPROVAL_STATE_IN_AUDIT !== $entity->huh_approval_state ||
+            !$backendUser->isAdmin
         ) {
             unset($dca['fields']['huh_approval_auditor'],
                 $dca['fields']['huh_approval_transition'],
@@ -70,11 +81,11 @@ class DcaManager
             );
 
             foreach ($this->bundleConfig[$table]['auditor_levels'] as $level) {
+                // b is symfony ByteString function, see use section at the top
                 unset($dca['fields']['huh_approval_state_'.b($level['name'])->lower()]);
             }
         }
 
-        $dca['config']['oncreate_callback'][] = [EntityApprovalContainer::class, 'onCreate'];
         $dca['config']['onsubmit_callback'][] = [EntityApprovalContainer::class, 'onSubmit'];
         $dca['config']['ctable'][] = 'tl_entity_approval_history';
         $dca['fields'][$this->bundleConfig[$table]['publish_field']]['save_callback'] = [[EntityApprovalContainer::class, 'onPublish']];
