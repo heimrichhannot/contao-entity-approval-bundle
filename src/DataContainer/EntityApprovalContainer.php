@@ -10,6 +10,7 @@ namespace HeimrichHannot\EntityApprovalBundle\DataContainer;
 use Contao\BackendUser;
 use Contao\DataContainer;
 use Contao\Model;
+use Contao\StringUtil;
 use HeimrichHannot\EntityApprovalBundle\Manager\NotificationManager;
 use HeimrichHannot\EntityApprovalBundle\Util\AuditorUtil;
 use HeimrichHannot\UtilsBundle\Database\DatabaseUtil;
@@ -92,32 +93,30 @@ class EntityApprovalContainer
         /** @var Model $model */
         $model = $this->modelUtil->findModelInstanceByPk($dc->table, $dc->id);
         $activeRecord = $dc->activeRecord;
-        $activeRow = $dc->activeRecord->row();
         $backendUser = BackendUser::getInstance();
 
+        $transition = $activeRecord->row()['huh_approval_transition'];
+
+        $modelAuditor = StringUtil::deserialize($model->huh_approval_auditor, true);
+
         if ($model->huh_approval_state === static::APPROVAL_STATE_CREATED) {
-            if (empty($activeRecord->huh_approval_transition)) {
-                $activeRecord->huh_approval_transition = static::APPROVAL_TRANSITION_SUBMIT;
+            if (empty($transition)) {
+                $transition = static::APPROVAL_TRANSITION_SUBMIT;
             }
-        } elseif (((int) $backendUser->id !== (int) $model->huh_approval_auditor || $model->huh_approval_state === static::APPROVAL_STATE_APPROVED) && !$backendUser->isAdmin) {
+        } elseif (
+            (!\in_array((string) $backendUser->id, $modelAuditor) || $model->huh_approval_state === static::APPROVAL_STATE_APPROVED)
+            && !$backendUser->isAdmin
+        ) {
             $message = $this->translator->trans('huh.entity_approval.blocking.modification_not_allowed');
 
             throw new \Exception($message);
         }
-//        else {
-//            $this->applyApprovalModelChanges($model, $activeRecord);
-//        }
 
-        $test = $dc->activeRecord->fetchAllAssoc();
-        $a = $dc->activeRecord->row();
-        $transition = $dc->activeRecord->huh_approval_transition;
-
-        if (!empty($activeRecord->huh_approval_transition)) {
-            if ($this->entityApprovalStateMachine->can($model, $activeRecord->huh_approval_transition)) {
-                $this->entityApprovalStateMachine->apply($model, $activeRecord->huh_approval_transition);
-            } else {
-                $this->createTransitionException($model, $activeRow);
-            }
+        if ($this->entityApprovalStateMachine->can($model, $transition)) {
+            $this->applyApprovalModelChanges($model, $activeRecord);
+            $this->entityApprovalStateMachine->apply($model, $transition);
+        } else {
+            $this->createTransitionException($model, $activeRecord->row());
         }
     }
 
@@ -207,15 +206,21 @@ class EntityApprovalContainer
 
     private function applyApprovalModelChanges(Model $model, $activeRecord): void
     {
+        $row = $model->row();
+
+        if ('' === $model->huh_approval_state) {
+            $row['huh_approval_state'] = static::APPROVAL_STATE_CREATED;
+        }
+
         if ($model->huh_approval_state === static::APPROVAL_STATE_IN_AUDIT) {
             $this->checkForLogicException((bool) $activeRecord->huh_approval_confirm_continue);
 
-            $row = $model->row();
             $row['huh_approval_notes'] = $activeRecord->{'huh_approval_notes'};
             $row['huh_approval_auditor'] = $activeRecord->{'huh_approval_auditor'};
-            $model->setRow($row);
-            $model->save();
         }
+
+        $model->setRow($row);
+        $model->save();
     }
 
     private function createTransitionException(Model $model, array $activeRecord): void
