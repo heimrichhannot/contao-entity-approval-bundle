@@ -7,10 +7,12 @@
 
 namespace HeimrichHannot\EntityApprovalBundle\Util;
 
+use Contao\Model;
 use HeimrichHannot\EntityApprovalBundle\DataContainer\EntityApprovalContainer;
 use HeimrichHannot\UtilsBundle\Database\DatabaseUtil;
 use HeimrichHannot\UtilsBundle\User\UserUtil;
 use Model\Collection;
+use function Symfony\Component\String\b;
 
 class AuditorUtil
 {
@@ -77,5 +79,22 @@ class AuditorUtil
         $auditors = $users->fetchAll();
 
         return array_column($auditors, 'id');
+    }
+
+    public function getNextAuditorGroupName(Model $entity): ?string
+    {
+        $levels = $this->bundleConfig[$entity->getTable()]['auditor_levels'];
+
+        foreach ($levels as $key => $level) {
+            if (EntityApprovalContainer::APPROVAL_STATE_APPROVED !== $entity->{'huh_approval_state_'.b($level['name'])}) {
+                if (0 === $key && EntityApprovalContainer::APPROVAL_STATE_IN_AUDIT !== $entity->{'huh_approval_state_'.b($level['name'])}) {
+                    return $levels[$key]['name'] ?? null;
+                }
+
+                return $levels[$key + 1]['name'] ?? null;
+            }
+        }
+
+        return null;
     }
 }

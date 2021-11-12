@@ -17,6 +17,7 @@ use HeimrichHannot\UtilsBundle\Database\DatabaseUtil;
 use HeimrichHannot\UtilsBundle\Dca\DcaUtil;
 use HeimrichHannot\UtilsBundle\Model\ModelUtil;
 use HeimrichHannot\UtilsBundle\User\UserUtil;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Translation\TranslatorInterface;
 use Symfony\Component\Workflow\Exception\LogicException;
 use Symfony\Component\Workflow\Exception\TransitionException;
@@ -95,7 +96,8 @@ class EntityApprovalContainer
         $activeRecord = $dc->activeRecord;
         $backendUser = BackendUser::getInstance();
 
-        $transition = $activeRecord->row()['huh_approval_transition'];
+        $request = Request::createFromGlobals();
+        $transition = $request->get('huh_approval_transition');
 
         $modelAuditor = StringUtil::deserialize($model->huh_approval_auditor, true);
 
@@ -113,7 +115,6 @@ class EntityApprovalContainer
         }
 
         if ($this->entityApprovalStateMachine->can($model, $transition)) {
-            $this->applyApprovalModelChanges($model, $activeRecord);
             $this->entityApprovalStateMachine->apply($model, $transition);
         } else {
             $this->createTransitionException($model, $activeRecord->row());
@@ -202,25 +203,6 @@ class EntityApprovalContainer
     public function onAuditorOptionsCallback(DataContainer $dc): array
     {
         return $this->auditorUtil->getEntityAuditorsByTable($dc->id, $dc->table);
-    }
-
-    private function applyApprovalModelChanges(Model $model, $activeRecord): void
-    {
-        $row = $model->row();
-
-        if ('' === $model->huh_approval_state) {
-            $row['huh_approval_state'] = static::APPROVAL_STATE_CREATED;
-        }
-
-        if ($model->huh_approval_state === static::APPROVAL_STATE_IN_AUDIT) {
-            $this->checkForLogicException((bool) $activeRecord->huh_approval_confirm_continue);
-
-            $row['huh_approval_notes'] = $activeRecord->{'huh_approval_notes'};
-            $row['huh_approval_auditor'] = $activeRecord->{'huh_approval_auditor'};
-        }
-
-        $model->setRow($row);
-        $model->save();
     }
 
     private function createTransitionException(Model $model, array $activeRecord): void

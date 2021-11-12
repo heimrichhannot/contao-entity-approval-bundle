@@ -6,7 +6,13 @@
  */
 
 use HeimrichHannot\EntityApprovalBundle\DependencyInjection\Configuration;
+use HeimrichHannot\EntityApprovalBundle\Manager\NotificationManager;
 
-$arrLang = &$GLOBALS['TL_LANG']['tl_nc_notification'];
+$lang = &$GLOBALS['TL_LANG']['tl_nc_notification'];
 
-$arrLang['type'][Configuration::ROOT_ID] = 'Freigabe';
+$lang['type'][Configuration::ROOT_ID] = 'Freigabe';
+
+$lang['type'][NotificationManager::NOTIFICATION_TYPE_STATE_CHANGED][0] = 'Statusänderung';
+$lang['type'][NotificationManager::NOTIFICATION_TYPE_STATE_CHANGED][1] = 'Dieser Benachrichtigungstyp wird zur Bekanntgabe von Statusänderungen verwendet.';
+$lang['type'][NotificationManager::NOTIFICATION_TYPE_AUDITOR_CHANGED][0] = 'Auditoränderung';
+$lang['type'][NotificationManager::NOTIFICATION_TYPE_AUDITOR_CHANGED][1] = 'Dieser Benachrichtigungstyp wird zur Bekanntgabe von Auditoränderungen verwendet.';

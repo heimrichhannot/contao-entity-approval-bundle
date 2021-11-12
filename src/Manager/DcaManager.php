@@ -13,6 +13,7 @@ use Contao\Input;
 use Contao\StringUtil;
 use HeimrichHannot\EntityApprovalBundle\DataContainer\EntityApprovalContainer;
 use HeimrichHannot\EntityApprovalBundle\Event\BeforeEntityGetModelEvent;
+use HeimrichHannot\UtilsBundle\Database\DatabaseUtil;
 use HeimrichHannot\UtilsBundle\Dca\DcaUtil;
 use HeimrichHannot\UtilsBundle\Model\ModelUtil;
 use HeimrichHannot\UtilsBundle\User\UserUtil;
@@ -30,9 +31,11 @@ class DcaManager
     protected ContainerUtil            $containerUtil;
     protected TranslatorInterface      $translator;
     protected EventDispatcherInterface $eventDispatcher;
+    protected DatabaseUtil             $databaseUtil;
 
     public function __construct(
         ContainerUtil $containerUtil,
+        DatabaseUtil $databaseUtil,
         DcaUtil $dcaUtil,
         EventDispatcherInterface $eventDispatcher,
         ModelUtil $modelUtil,
@@ -47,34 +50,16 @@ class DcaManager
         $this->containerUtil = $containerUtil;
         $this->translator = $translator;
         $this->eventDispatcher = $eventDispatcher;
+        $this->databaseUtil = $databaseUtil;
     }
 
     public function addApprovalToDca(string $table): void
     {
         $this->dcaUtil->loadDc($table);
         $this->addApprovalFieldsToDca($table);
-
-        $entityId = Input::get('id') ?? '';
-
-        /** @var BeforeEntityGetModelEvent $event */
-        $event = $this->eventDispatcher->dispatch(new BeforeEntityGetModelEvent($table, $entityId), BeforeEntityGetModelEvent::NAME);
-
-        if (null === ($entity = $this->modelUtil->findModelInstanceByPk($event->getTable(), $event->getEntityId()))) {
-            return;
-        }
-
-        $author = $entity->row()[$this->bundleConfig[$table]['author_email_field']];
-
         $dca = &$GLOBALS['TL_DCA'][$table];
 
-        $backendUser = BackendUser::getInstance();
-
-        if (
-            (((string) $backendUser->email === (string) $author ||
-            !\in_array((string) $backendUser->id, StringUtil::deserialize($entity->huh_approval_auditor, true))) &&
-            EntityApprovalContainer::APPROVAL_STATE_IN_AUDIT !== $entity->huh_approval_state) ||
-            $backendUser->isAdmin
-        ) {
+        if (!$this->displayApprovalFields($table)) {
             unset($dca['fields']['huh_approval_auditor'],
                 $dca['fields']['huh_approval_transition'],
                 $dca['fields']['huh_approval_inform_author'],
@@ -97,6 +82,54 @@ class DcaManager
             'href' => 'table=tl_entity_approval_history&ptable='.$table,
             'icon' => 'diff.gif',
         ];
+    }
+
+    public function displayApprovalFields(string $table): bool
+    {
+        $entityId = Input::get('id') ?? '';
+
+        /** @var BeforeEntityGetModelEvent $event */
+        $event = $this->eventDispatcher->dispatch(new BeforeEntityGetModelEvent($table, $entityId), BeforeEntityGetModelEvent::NAME);
+
+        if (null === ($entity = $this->modelUtil->findModelInstanceByPk($event->getTable(), $event->getEntityId()))) {
+            return false;
+        }
+
+        $author = $entity->row()[$this->bundleConfig[$table]['author_email_field']];
+        $backendUser = BackendUser::getInstance();
+
+        if ('group' === Input::get('do')) {
+            return true;
+        }
+
+        if ($backendUser->isAdmin) {
+            return false;
+        }
+
+        // if usergroup is not in state in_audit => false
+        $groups = implode(',', $backendUser->groups);
+
+        if (null !== ($userGroups = $this->databaseUtil->findResultsBy('tl_user_group', ['tl_user_group.id IN (?)'], [$groups]))) {
+            foreach ($userGroups as $group) {
+                if (EntityApprovalContainer::APPROVAL_STATE_IN_AUDIT === $entity->{'huh_approval_state_'.$group->name}) {
+                    return true;
+                }
+            }
+        }
+
+        if ($backendUser->email === (string) $author) {
+            return false;
+        }
+
+        if (!\in_array((string) $backendUser->id, StringUtil::deserialize($entity->huh_approval_auditor, true))) {
+            return false;
+        }
+
+        if (EntityApprovalContainer::APPROVAL_STATE_IN_AUDIT !== $entity->huh_approval_state) {
+            return false;
+        }
+
+        return true;
     }
 
     public function addAuthorFieldsToHistory()

@@ -9,17 +9,21 @@ namespace HeimrichHannot\EntityApprovalBundle\EventSubscriber;
 
 use Contao\BackendUser;
 use Contao\Model;
+use Contao\StringUtil;
 use HeimrichHannot\EntityApprovalBundle\DataContainer\EntityApprovalContainer;
 use HeimrichHannot\EntityApprovalBundle\DependencyInjection\Configuration;
 use HeimrichHannot\EntityApprovalBundle\Dto\NotificationCenterOptionsDto;
 use HeimrichHannot\EntityApprovalBundle\Manager\NotificationManager;
 use HeimrichHannot\EntityApprovalBundle\Model\EntityApprovalHistoryModel;
+use HeimrichHannot\EntityApprovalBundle\Util\AuditorUtil;
 use HeimrichHannot\UtilsBundle\Database\DatabaseUtil;
 use HeimrichHannot\UtilsBundle\Model\ModelUtil;
 use HeimrichHannot\UtilsBundle\User\UserUtil;
 use Model\Collection;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
+use Symfony\Component\HttpFoundation\Request;
+use function Symfony\Component\String\b;
 use Symfony\Component\Workflow\Event\CompletedEvent;
 use Symfony\Component\Workflow\Event\EnteredEvent;
 use Symfony\Component\Workflow\WorkflowInterface;
@@ -38,6 +42,7 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
     protected ModelUtil               $modelUtil;
     protected DatabaseUtil            $databaseUtil;
     protected EntityApprovalContainer $entityApprovalContainer;
+    protected AuditorUtil             $auditorUtil;
 
     public function __construct(
         DatabaseUtil $databaseUtil,
@@ -48,6 +53,7 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
         TranslatorInterface $translator,
         UserUtil $userUtil,
         WorkflowInterface $entityApprovalStateMachine,
+        AuditorUtil $auditorUtil,
         array $bundleConfig
     ) {
         $this->translator = $translator;
@@ -59,6 +65,7 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
         $this->modelUtil = $modelUtil;
         $this->databaseUtil = $databaseUtil;
         $this->entityApprovalContainer = $entityApprovalContainer;
+        $this->auditorUtil = $auditorUtil;
     }
 
     public static function getSubscribedEvents()
@@ -77,6 +84,7 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
         $informAuthor = (bool) $model->huh_approval_inform_author;
         $transition = $event->getTransition()->getName();
         $backendUser = BackendUser::getInstance();
+        $request = Request::createFromGlobals();
 
         $resetOptions = [];
         $informAuthorOptions = [];
@@ -115,6 +123,10 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
                 $resetOptions['state'] = EntityApprovalContainer::APPROVAL_STATE_IN_AUDIT;
                 $resetOptions['auditor'] = serialize($auditor);
 
+                foreach ($backendUser->groups as $group) {
+                    $resetOptions['group'][$group] = EntityApprovalContainer::APPROVAL_STATE_IN_AUDIT;
+                }
+
                 // fill in history data
                 $history->pid = $model->id;
                 $history->ptable = $table;
@@ -127,8 +139,8 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
                 break;
 
             case EntityApprovalContainer::APPROVAL_TRANSITION_ASSIGN_NEW_AUDITOR:
-                if (!empty($model->huh_approval_auditor)) {
-                    if (null !== ($auditor = $this->modelUtil->findModelInstanceByPk('tl_user', $model->huh_approval_auditor))) {
+                if (!empty($request->get('huh_approval_auditor'))) {
+                    if (null !== ($auditor = $this->modelUtil->findModelInstanceByPk('tl_user', $request->get('huh_approval_auditor')))) {
                         $notificationOptions->table = $table;
                         $notificationOptions->author = $model->{$this->bundleConfig[$table]['author_email_field']};
                         $notificationOptions->auditor = $auditor->id;
@@ -143,17 +155,24 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
                 $history->dateAdded = time();
                 $history->transition = EntityApprovalContainer::APPROVAL_TRANSITION_ASSIGN_NEW_AUDITOR;
                 $history->state = EntityApprovalContainer::APPROVAL_STATE_IN_AUDIT;
-                $history->auditor = serialize([$model->huh_approval_auditor]);
-                $history->notes = $model->huh_approval_notes;
+                $history->auditor = serialize([$request->get('huh_approval_auditor')]);
+                $history->notes = $request->get('huh_approval_notes');
                 $history->author = $backendUser->id;
-                $history->informAuthor = $informAuthor;
+                $history->informAuthor = (bool) $request->get('huh_approval_inform_author');
 
                 $informAuthorOptions['table'] = $table;
-                $informAuthorOptions['auditor'] = $auditor->id;
+                $informAuthorOptions['auditor'] = $request->get('huh_approval_auditor');
                 $informAuthorOptions['authorEmail'] = $model->{$this->bundleConfig[$table]['author_email_field']};
                 $informAuthorOptions['state'] = EntityApprovalContainer::APPROVAL_STATE_IN_AUDIT;
 
                 $resetOptions['state'] = EntityApprovalContainer::APPROVAL_STATE_IN_AUDIT;
+
+                // apply in_audit state to entity group state
+                $auditorGroups = StringUtil::deserialize($auditor->groups, true);
+
+                foreach ($auditorGroups as $group) {
+                    $resetOptions['group'][$group] = EntityApprovalContainer::APPROVAL_STATE_IN_AUDIT;
+                }
 
                 break;
 
@@ -187,12 +206,14 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
 
                 $resetOptions['state'] = EntityApprovalContainer::APPROVAL_STATE_CREATED;
 
+                foreach ($backendUser->groups as $group) {
+                    $resetOptions['group'][$group] = EntityApprovalContainer::APPROVAL_STATE_IN_AUDIT;
+                }
+
                 break;
 
             case EntityApprovalContainer::APPROVAL_TRANSITION_APPROVE:
                 $state = array_search(1, $event->getMarking()->getPlaces(), true);
-
-                $author = $model->{$this->bundleConfig[$table]['author_email_field']};
 
                 $history->pid = $model->id;
                 $history->ptable = $table;
@@ -202,55 +223,29 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
                 $history->notes = $model->huh_approval_notes;
                 $history->author = $backendUser->id;
                 $history->informAuthor = $informAuthor;
-                $this->saveHistoryEntry($history);
 
-                // check if all auditors approved
-                $history = $this->databaseUtil->findResultsBy(
-                    'tl_entity_approval_history',
-                    ['tl_entity_approval_history.pid=?', 'tl_entity_approval_history.ptable=?'],
-                    [$model->id, $table]
-                )->fetchAllAssoc();
+                if ($this->isEntityApproved($model)) {
+                    $resetOptions['state'] = EntityApprovalContainer::APPROVAL_STATE_APPROVED;
+                } else {
+                    if (null !== ($levelName = $this->auditorUtil->getNextAuditorGroupName($model))) {
+                        $newAuditor = $this->auditorUtil->getAuditorFromGroups($table, $levelName);
 
-                $approvalHistoryAuditors = array_column($history, 'auditor');
+                        if (!empty($newAuditor)) {
+                            $notificationOptions->table = $table;
+                            $notificationOptions->author = $model->{$this->bundleConfig[$table]['author_email_field']};
+                            $notificationOptions->auditor = $newAuditor[0];
+                            $notificationOptions->state = EntityApprovalContainer::APPROVAL_STATE_IN_AUDIT;
+                            $notificationOptions->type = NotificationManager::NOTIFICATION_TYPE_STATE_CHANGED;
+                            $notificationOptions->recipients = $this->collectAuditorEmails($newAuditor);
 
-                // get users per approval level
-                $levelApproval = [];
-                $levelUsers = [];
-
-                foreach ($this->bundleConfig[$table]['auditor_levels'] as $level) {
-                    /** @var Collection $users */
-                    if (null === ($users = $this->userUtil->findActiveByGroups($level['groups']))) {
-                        continue;
+                            $resetOptions['auditor'] = $newAuditor;
+                        }
                     }
-                    $levelUsers[$level['name']] = array_column($users->fetchAll(), 'id');
-
-                    if (array_intersect($levelUsers[$level['name']], $approvalHistoryAuditors)) {
-                        $levelApproval[$level['name']] = true;
-
-                        continue;
-                    }
-                    $levelApproval[$level['name']] = false;
+                    $resetOptions['state'] = EntityApprovalContainer::APPROVAL_STATE_IN_AUDIT;
                 }
 
-                // check if unapproved levels
-                if (\in_array(false, $levelApproval, true)) {
-                    // select next level
-                    $levelName = array_search(false, $levelApproval);
-                    $newAuditors = $this->entityApprovalContainer->getAuditorFromGroups($table, $levelName);
-
-                    if (!empty($model->huh_approval_auditor)) {
-                        $notificationOptions->table = $table;
-                        $notificationOptions->author = $model->{$this->bundleConfig[$table]['author_email_field']};
-                        $notificationOptions->auditor = $model->huh_approval_auditor;
-                        $notificationOptions->state = EntityApprovalContainer::APPROVAL_STATE_IN_AUDIT;
-                        $notificationOptions->type = NotificationManager::NOTIFICATION_TYPE_STATE_CHANGED;
-                        $notificationOptions->recipients = $this->collectAuditorEmails($newAuditors);
-                    }
-
-                    $resetOptions['auditor'] = $newAuditors;
-                    $resetOptions['state'] = EntityApprovalContainer::APPROVAL_STATE_IN_AUDIT;
-                } else {
-                    $resetOptions['state'] = EntityApprovalContainer::APPROVAL_STATE_APPROVED;
+                foreach ($backendUser->groups as $group) {
+                    $resetOptions['group'][$group] = EntityApprovalContainer::APPROVAL_STATE_APPROVED;
                 }
 
                 break;
@@ -269,6 +264,10 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
 
                 // reject entity
                 $resetOptions['state'] = $state;
+
+                foreach ($backendUser->groups as $group) {
+                    $resetOptions['group'][$group] = EntityApprovalContainer::APPROVAL_STATE_REJECTED;
+                }
 
                 // send mail to all auditors
                 $notificationOptions->table = $table;
@@ -399,7 +398,7 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
             return [];
         }
 
-        $auditors = $users->fetchAll();
+        $auditors = $users->fetchAllAssoc();
 
         return array_column($auditors, 'email');
     }
@@ -410,8 +409,52 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
         $model->huh_approval_state = $options['state'] ?? $model->huh_approval_state;
         $model->huh_approval_inform_author = $options['inform_author'] ?? '';
         $model->huh_approval_transition = $options['transition'] ?? '';
-        $model->huh_approval_confirm_continue = $options['confirm_continue'] ?? '';
+        $model->huh_approval_confirm_continue = '';
         $model->huh_approval_auditor = $options['auditor'] ?? $model->huh_approval_auditor;
+
+        if (!empty($options['group'])) {
+            foreach ($options['group'] as $group => $state) {
+                foreach ($this->bundleConfig[$model->getTable()]['auditor_levels'] as $level) {
+                    if (\in_array($group, $level['groups'])) {
+                        $model->{'huh_approval_state_'.b($level['name'])} = $state;
+                    }
+                }
+            }
+        }
+
         $model->save();
+    }
+
+    private function isEntityApproved(Model $entity): bool
+    {
+        // check if all auditors approved
+        $savedHistory = $this->databaseUtil->findResultsBy(
+            'tl_entity_approval_history',
+            ['tl_entity_approval_history.pid=?', 'tl_entity_approval_history.ptable=?'],
+            [$entity->id, $entity->getTable()]
+        )->fetchAllAssoc();
+
+        $adjustedHistory = [];
+        $auditorLevels = $this->bundleConfig[$entity->getTable()]['auditor_levels'];
+
+        foreach ($savedHistory as $history) {
+            if (null === ($userGroups = $this->userUtil->getActiveGroups($history['author']))) {
+                $userGroups = [];
+            }
+
+            foreach ($auditorLevels as $auditorLevel) {
+                if (array_intersect($auditorLevel['groups'], $userGroups->fetchEach('id'))) {
+                    $adjustedHistory[$auditorLevel['name']] = $history['transition'];
+                }
+            }
+        }
+
+        foreach ($auditorLevels as $level) {
+            if (EntityApprovalContainer::APPROVAL_STATE_APPROVED !== $entity->{'huh_approval_state_'.b($level['name'])} || EntityApprovalContainer::APPROVAL_TRANSITION_ASSIGN_NEW_AUDITOR !== $adjustedHistory[$level]) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }
