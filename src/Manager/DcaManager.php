@@ -78,9 +78,10 @@ class DcaManager
         $dca['fields'][$this->bundleConfig[$table]['publish_field']]['save_callback'] = [[EntityApprovalContainer::class, 'onPublish']];
 
         $dca['list']['operations']['show_history'] = [
-            'label' => &$GLOBALS['TL_LANG']['MSG']['approval_history'],
+            'label' => &$GLOBALS['TL_LANG']['MOD']['entityApproval'],
+            'button_callback' => [EntityApprovalContainer::class, 'historyButtonCallback'],
             'href' => 'table=tl_entity_approval_history&ptable='.$table,
-            'icon' => 'diff.gif',
+            'icon' => 'loading.svg',
         ];
     }
 
@@ -152,6 +153,16 @@ class DcaManager
             $dca['fields']['author']['eval']['readonly'] = true;
             $dca['fields']['author']['eval']['tl_class'] = 'w50 readonly';
             $dca['fields']['authorType']['sql'] = "varchar(255) NOT NULL default 'user'";
+        }
+    }
+
+    public function listHistoryChildren(): void
+    {
+        $dca = &$GLOBALS['TL_DCA']['tl_entity_approval_history'];
+        $user = BackendUser::getInstance();
+
+        if (!$user->isAdmin) {
+            $dca['list']['sorting']['filter'] = [['auditor LIKE (?)', '%'.$user->id.'%'], ['state=?', EntityApprovalContainer::APPROVAL_STATE_IN_AUDIT]];
         }
     }
 

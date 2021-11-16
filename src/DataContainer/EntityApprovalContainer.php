@@ -8,6 +8,7 @@
 namespace HeimrichHannot\EntityApprovalBundle\DataContainer;
 
 use Contao\BackendUser;
+use Contao\Controller;
 use Contao\DataContainer;
 use Contao\Model;
 use Contao\StringUtil;
@@ -18,6 +19,7 @@ use HeimrichHannot\UtilsBundle\Dca\DcaUtil;
 use HeimrichHannot\UtilsBundle\Model\ModelUtil;
 use HeimrichHannot\UtilsBundle\User\UserUtil;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 use Symfony\Component\Translation\TranslatorInterface;
 use Symfony\Component\Workflow\Exception\LogicException;
 use Symfony\Component\Workflow\Exception\TransitionException;
@@ -66,9 +68,11 @@ class EntityApprovalContainer
     protected array               $bundleConfig;
     protected DcaUtil             $dcaUtil;
     protected AuditorUtil         $auditorUtil;
+    protected CsrfTokenManagerInterface    $csrfTokenManager;
 
     public function __construct(
         AuditorUtil $auditorUtil,
+        CsrfTokenManagerInterface $csrfTokenManager,
         DatabaseUtil $databaseUtil,
         DcaUtil $dcaUtil,
         ModelUtil $modelUtil,
@@ -87,6 +91,7 @@ class EntityApprovalContainer
         $this->bundleConfig = $bundleConfig;
         $this->dcaUtil = $dcaUtil;
         $this->auditorUtil = $auditorUtil;
+        $this->csrfTokenManager = $csrfTokenManager;
     }
 
     public function onSubmit(?DataContainer $dc): void
@@ -203,6 +208,55 @@ class EntityApprovalContainer
     public function onAuditorOptionsCallback(DataContainer $dc): array
     {
         return $this->auditorUtil->getEntityAuditorsByTable($dc->id, $dc->table);
+    }
+
+    public function historyButtonCallback(
+        array $row,
+        ?string $href,
+        string $label,
+        string $title,
+        ?string $icon,
+        ?string $attributes,
+        ?string $table,
+        ?array $rootRecords,
+        ?array $childRecords,
+        ?bool $isCircular,
+        ?string $prevLabel,
+        ?string $nextLabel,
+        DataContainer $dc
+    ): string {
+        switch ($row['huh_approval_state']) {
+            case static::APPROVAL_STATE_IN_AUDIT:
+                $icon = 'loading.svg';
+
+                break;
+
+            case static::APPROVAL_STATE_APPROVED:
+                $icon = 'ok.svg';
+
+                break;
+
+            case static::APPROVAL_STATE_REJECTED:
+                $icon = 'stop.svg';
+
+                break;
+
+            case static::APPROVAL_STATE_CREATED:
+                $icon = 'important.svg';
+
+                break;
+
+            default:
+                break;
+        }
+
+        $token = $this->csrfTokenManager->getToken('rt');
+        $historyUrl = Controller::addToUrl($href.'&amp;id='.$row['id']).'&rt='.$token->getValue();
+        $button = '<a style="margin-left: 16px;" href="'.$historyUrl.'" title="'.StringUtil::specialchars($title).'"'.$attributes.'>
+            <img src="system/themes/flexible/icons/'.$icon.'" width="16" height="16" alt="'.StringUtil::specialchars($title).'">
+        </a>';
+
+        return $button;
     }
 
     private function createTransitionException(Model $model, array $activeRecord): void

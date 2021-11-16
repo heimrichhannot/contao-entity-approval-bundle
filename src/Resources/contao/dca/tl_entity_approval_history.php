@@ -5,9 +5,12 @@
  * @license LGPL-3.0-or-later
  */
 
+use HeimrichHannot\EntityApprovalBundle\DataContainer\EntityApprovalContainer;
+
 $GLOBALS['TL_DCA'][\HeimrichHannot\EntityApprovalBundle\Model\EntityApprovalHistoryModel::getTable()] = [
     'config' => [
         'dataContainer' => 'Table',
+        'ptable' => 'tl_submission',
         'enableVersioning' => false,
         'dynamicPtable' => true,
         'closed' => true,
@@ -20,30 +23,18 @@ $GLOBALS['TL_DCA'][\HeimrichHannot\EntityApprovalBundle\Model\EntityApprovalHist
     ],
     'list' => [
         'label' => [
-            'fields' => ['author', 'state', 'transition', 'notes', 'auditor'],
-            'headerFields' => ['author', 'state', 'transition', 'notes', 'auditor'],
+            'fields' => ['state', 'transition', 'notes', 'auditor'],
             'format' => '%s',
             'showColumns' => true,
         ],
         'sorting' => [
-            'mode' => 0,
-            'fields' => ['dateAdded'],
+            'mode' => 1,
+            'fields' => ['dateAdded ASC'],
             'panelLayout' => 'filter;sort,search,limit',
         ],
         'global_operations' => [
         ],
         'operations' => [
-            'edit' => [
-                'label' => &$GLOBALS['TL_LANG']['tl_draft_archive_action']['edit'],
-                'href' => 'act=edit',
-                'icon' => 'edit.gif',
-            ],
-            'delete' => [
-                'label' => &$GLOBALS['TL_LANG']['tl_comments_history']['delete'],
-                'href' => 'act=delete',
-                'icon' => 'delete.gif',
-                'attributes' => 'onclick="if(!confirm(\''.$GLOBALS['TL_LANG']['MSC']['deleteConfirm'].'\'))return false;Backend.getScrollOffset()"',
-            ],
         ],
     ],
     'palettes' => [
@@ -88,19 +79,27 @@ $GLOBALS['TL_DCA'][\HeimrichHannot\EntityApprovalBundle\Model\EntityApprovalHist
         ],
         'state' => [
             'label' => &$GLOBALS['TL_LANG']['MSC']['approval_state'],
-            'inputType' => 'text',
-            'eval' => ['tl_class' => 'w50'],
+            'inputType' => 'select',
+            'options' => EntityApprovalContainer::APPROVAL_STATES,
+            'reference' => &$GLOBALS['TL_LANG']['MSC']['approval_state'],
+            'eval' => [
+                'tl_class' => 'w50',
+                'readonly' => true,
+            ],
             'sql' => "varchar(32) NOT NULL default ''",
         ],
         'transition' => [
             'label' => &$GLOBALS['TL_LANG']['MSC']['approval_transition'],
-            'inputType' => 'text',
+            'inputType' => 'select',
             'eval' => ['tl_class' => 'w50'],
+            'options_callback' => [EntityApprovalContainer::class, 'getAvailableTransitions'],
+            'reference' => $GLOBALS['TL_LANG']['MSC']['reference'],
             'sql' => "varchar(64) NOT NULL default ''",
         ],
         'auditor' => [
             'label' => &$GLOBALS['TL_LANG']['MSC']['approval_auditor'],
-            'inputType' => 'select',
+            'exclude' => true,
+            'inputType' => 'text',
             'eval' => ['tl_class' => 'clr w50', 'chosen' => true, 'multiple' => true],
             'sql' => "varchar(255) NOT NULL default ''",
         ],

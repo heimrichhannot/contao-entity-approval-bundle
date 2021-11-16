@@ -11,6 +11,7 @@ use Contao\CoreBundle\ServiceAnnotation\Callback;
 use Contao\DataContainer;
 use HeimrichHannot\EntityApprovalBundle\Util\AuditorUtil;
 use HeimrichHannot\UtilsBundle\Database\DatabaseUtil;
+use HeimrichHannot\UtilsBundle\Model\ModelUtil;
 use HeimrichHannot\UtilsBundle\User\UserUtil;
 
 class EntityApprovalHistoryContainer
@@ -20,11 +21,13 @@ class EntityApprovalHistoryContainer
     protected UserUtil                $userUtil;
     protected EntityApprovalContainer $entityApprovalContainer;
     protected AuditorUtil             $auditorUtil;
+    protected ModelUtil               $modelUtil;
 
     public function __construct(
         AuditorUtil $auditorUtil,
         DatabaseUtil $databaseUtil,
         EntityApprovalContainer $entityApprovalContainer,
+        ModelUtil $modelUtil,
         UserUtil $userUtil,
         array $bundleConfig
     ) {
@@ -33,6 +36,7 @@ class EntityApprovalHistoryContainer
         $this->userUtil = $userUtil;
         $this->entityApprovalContainer = $entityApprovalContainer;
         $this->auditorUtil = $auditorUtil;
+        $this->modelUtil = $modelUtil;
     }
 
     /**
@@ -40,6 +44,7 @@ class EntityApprovalHistoryContainer
      */
     public function onLoadEntityApprovalHistory(DataContainer $dc)
     {
+        $test = '';
     }
 
     /**
@@ -50,5 +55,19 @@ class EntityApprovalHistoryContainer
         $activeRecord = $dc->activeRecord;
 
         return $this->auditorUtil->getEntityAuditorsByTable($activeRecord->pid, $activeRecord->ptable);
+    }
+
+    /**
+     * @Callback(table="tl_entity_approval_history", target="list.label.label")
+     */
+    public function prepareListLabels(array $row, string $label, DataContainer $dc, array $columns): array
+    {
+        $labels = $columns;
+
+        if (null !== ($auditor = $this->modelUtil->findModelInstanceByPk('tl_user', $columns[3]))) {
+            $labels[3] = $auditor->firstname.' '.$auditor->lastname.' '.$auditor->email;
+        }
+
+        return $labels;
     }
 }

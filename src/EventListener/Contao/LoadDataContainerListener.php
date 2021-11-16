@@ -39,6 +39,7 @@ class LoadDataContainerListener
 
         if ($table === EntityApprovalHistoryModel::getTable()) {
             $this->manager->addAuthorFieldsToHistory();
+            $this->manager->listHistoryChildren();
         }
     }
 }

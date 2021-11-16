@@ -6,4 +6,4 @@
  */
 
 $GLOBALS['TL_LANG']['MOD']['entityApproval'][0] = 'Freigabe';
-$GLOBALS['TL_LANG']['MOD']['entityApproval'][1] = 'Freigabe-Workflows einsehen';
+$GLOBALS['TL_LANG']['MOD']['entityApproval'][1] = 'Freigabe-Workflow einsehen';
