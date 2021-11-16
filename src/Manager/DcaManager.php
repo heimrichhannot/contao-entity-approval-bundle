@@ -68,9 +68,11 @@ class DcaManager
             );
         }
 
-        foreach ($this->bundleConfig[$table]['auditor_levels'] as $level) {
-            // b is symfony ByteString function, see use section at the top
-            unset($dca['fields']['huh_approval_state_'.b($level['name'])->lower()]);
+        if (!$this->displayGroupStateFields($table)) {
+            foreach ($this->bundleConfig[$table]['auditor_levels'] as $level) {
+                // b is symfony ByteString function, see use section at the top
+                unset($dca['fields']['huh_approval_state_'.b($level['name'])->lower()]);
+            }
         }
 
         $dca['config']['onsubmit_callback'][] = [EntityApprovalContainer::class, 'onSubmit'];
@@ -93,13 +95,18 @@ class DcaManager
         $event = $this->eventDispatcher->dispatch(new BeforeEntityGetModelEvent($table, $entityId), BeforeEntityGetModelEvent::NAME);
 
         if (null === ($entity = $this->modelUtil->findModelInstanceByPk($event->getTable(), $event->getEntityId()))) {
-            return false;
+            // is used to display fields in /contao/install or in backend selectable palettes
+            return true;
         }
 
         $author = $entity->row()[$this->bundleConfig[$table]['author_email_field']];
         $backendUser = BackendUser::getInstance();
 
         if ('group' === Input::get('do')) {
+            return true;
+        }
+
+        if ($table !== Input::get('table')) {
             return true;
         }
 
@@ -164,6 +171,17 @@ class DcaManager
         if (!$user->isAdmin) {
             $dca['list']['sorting']['filter'] = [['auditor LIKE (?)', '%'.$user->id.'%'], ['state=?', EntityApprovalContainer::APPROVAL_STATE_IN_AUDIT]];
         }
+    }
+
+    private function displayGroupStateFields(string $table): bool
+    {
+        $inputTable = Input::get('table') ?? '';
+
+        if ($table !== $inputTable) {
+            return true;
+        }
+
+        return false;
     }
 
     private function addApprovalFieldsToDca(string $table): void
