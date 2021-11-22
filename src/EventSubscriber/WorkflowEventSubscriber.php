@@ -141,6 +141,7 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
             case EntityApprovalContainer::APPROVAL_TRANSITION_ASSIGN_NEW_AUDITOR:
                 if (!empty($request->get('huh_approval_auditor'))) {
                     if (null !== ($auditor = $this->modelUtil->findModelInstanceByPk('tl_user', $request->get('huh_approval_auditor')))) {
+                        $notificationOptions->entityId = $model->id;
                         $notificationOptions->table = $table;
                         $notificationOptions->author = $model->{$this->bundleConfig[$table]['author_email_field']};
                         $notificationOptions->auditor = $auditor->id;
@@ -185,6 +186,7 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
                     $notificationOptions->table = $table;
                     $notificationOptions->author = $model->{$this->bundleConfig[$table]['author_email_field']};
                     $notificationOptions->auditor = $auditor->id;
+                    $notificationOptions->entityId = $model->id;
                     $notificationOptions->state = EntityApprovalContainer::APPROVAL_STATE_IN_AUDIT;
                     $notificationOptions->type = NotificationManager::NOTIFICATION_TYPE_STATE_CHANGED;
                     $notificationOptions->recipients = $auditor->email;
@@ -237,6 +239,7 @@ class WorkflowEventSubscriber implements EventSubscriberInterface
                             $notificationOptions->state = EntityApprovalContainer::APPROVAL_STATE_IN_AUDIT;
                             $notificationOptions->type = NotificationManager::NOTIFICATION_TYPE_STATE_CHANGED;
                             $notificationOptions->recipients = $this->collectAuditorEmails($newAuditor);
+                            $notificationOptions->entityId = $model->id;
 
                             $resetOptions['auditor'] = $newAuditor;
                         }

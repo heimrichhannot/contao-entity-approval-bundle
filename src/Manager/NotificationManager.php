@@ -53,7 +53,7 @@ class NotificationManager
     private function generateTokens(NotificationCenterOptionsDto $options): array
     {
         $tokens = [];
-        $tokens['entity_url'] = Environment::get('url').'contao?do=submission&table='.$options->table.'&id='.$options->entityId.'&act=edit';
+        $tokens['entity_url'] = Environment::get('url').'/contao?do=submission&table='.$options->table.'&id='.$options->entityId.'&act=edit';
 
         if (null !== ($entity = $this->modelUtil->findModelInstanceByPk($options->table, $options->entityId))) {
             $dc = new DC_Table_Utils($options->table);
